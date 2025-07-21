@@ -182,24 +182,27 @@ input:focus-visible {
   background-color: rgba(16, 185, 129, 0.05) !important;
 }
 
-/* Enhanced bounding box styles */
+/* Find and replace these rules in App.css */
+
 .bounding-box {
   position: absolute;
-  border: 2px solid rgba(239, 68, 68, 0.8);
+  /* FIX: Thinner 1px border for better visibility */
+  border: 1px solid rgba(239, 68, 68, 0.9);
   cursor: pointer;
   transition: all 0.2s ease;
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2);
+  border-radius: 2px; /* A slightly tighter radius */
+  /* FIX: A very subtle shadow instead of a thick border */
+  box-shadow: 0 0 3px rgba(239, 68, 68, 0.2);
 }
 
 .bounding-box:hover {
   background-color: rgba(239, 68, 68, 0.1);
   border-color: rgba(239, 68, 68, 1);
-  transform: scale(1.02);
 }
 
 .bounding-box.selected {
   background-color: rgba(16, 185, 129, 0.3) !important;
+  /* FIX: Keep the selected border slightly thicker to stand out */
   border: 2px solid #10b981 !important;
   box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
 }
@@ -344,7 +347,14 @@ input:focus-visible {
   }
   
   .App-main {
-    display: block !important;
+  max-width: 1600px; /* Make the main area slightly wider */
+  margin: 0 auto;
+  padding: 3rem 2rem;
+  display: grid;
+  /* Change this line to give the image more space */
+  grid-template-columns: 1.5fr 1fr; /* Image panel is 50% wider than results panel */
+  gap: 3rem;
+  align-items: flex-start;
   }
   
   .image-container,
@@ -357,4 +367,102 @@ input:focus-visible {
     box-shadow: none !important;
     border: 1px solid #000;
   }
+}
+
+/* === NEW STYLES for Zoom Controls and Image Wrapper === */
+
+.image-preview-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.zoom-controls {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 20;
+  display: flex;
+  gap: 8px;
+  background-color: rgba(255, 255, 255, 0.8);
+  padding: 8px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.zoom-controls button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background-color: #fff;
+  color: #374151;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.zoom-controls button:hover {
+  background-color: #667eea;
+  color: white;
+  transform: scale(1.1);
+}
+
+.transform-wrapper {
+  width: 100%;
+  height: 100%;
+}
+
+/* Make bounding boxes relative to the image inside the zoom container */
+.preview-image {
+  position: relative;
+  width: 100%;
+}
+
+.bounding-box {
+  /* This is a change: the box is positioned relative to its parent, the image */
+  position: absolute;
+  /* (rest of bounding-box styles are the same) */
+}
+
+/* Add this to the bottom of App.css */
+
+.image-box-container {
+  position: relative;
+  width: 100%;
+  height: auto;
+  display: inline-block; /* Ensures the container shrinks to the image size */
+}
+
+/* ADD THIS TO THE BOTTOM OF YOUR App.css FILE */
+
+.results-section .animate-fade-in {
+  /* This is the container for your form and table data */
+  /* Make it fill the available height, leaving room for the title */
+  height: calc(100vh - 180px); /* Adjust 180px as needed based on your header/title height */
+  
+  /* THIS IS THE CRITICAL FIX: Add a vertical scrollbar when content overflows */
+  overflow-y: auto; 
+  
+  padding: 0 1rem; /* Add some padding for better spacing */
+}
+
+/* Add some spacing between the form and table sections */
+.data-section + .data-section {
+  margin-top: 2rem;
+}
+
+/* Add some styling to the table inputs for better UX */
+.table-input {
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 0.5rem;
+  border-radius: 6px;
+  width: 100%;
+}
+.table-input:focus {
+  background-color: white;
+  border-color: #667eea;
+  outline: none;
 }
