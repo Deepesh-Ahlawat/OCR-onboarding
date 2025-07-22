@@ -250,6 +250,21 @@ body {
 }
 
 
+/*
+  THE CRITICAL FIX IS HERE
+*/
+.merged-cell .cell-content {
+  /* This forces the div to take up the full width of the parent <td> */
+  display: block; 
+  background-color: #dbeafe; /* Light Blue */
+  border-color: #bfdbfe;
+  color: #1e40af;
+  font-weight: 600;
+  /* Centering the text looks better in wide merged cells */
+  text-align: center; 
+}
+
+
 /* Header and controls for tables */
 .table-header-controls {
   display: flex;
