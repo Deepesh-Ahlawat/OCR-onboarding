@@ -1,3 +1,5 @@
+// src/App.js
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, FileText, Eye, AlertCircle, CheckCircle, Loader, ZoomIn, ZoomOut, RotateCcw, Table } from 'lucide-react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
@@ -19,20 +21,21 @@ function App() {
 
   const imageRef = useRef(null);
   const fileInputRef = useRef(null);
+  // --- NEW REF for zoom controls ---
+  const transformComponentRef = useRef(null);
+
 
   // Cleanup URL
   useEffect(() => () => { if (imageUrl) URL.revokeObjectURL(imageUrl); }, [imageUrl]);
 
-  // --- PARSE & BUILD TABLES with Manual Vertical Merge ---
+  // --- PARSE & BUILD TABLES (No changes to this logic) ---
   const parseAndRenderTables = (jsonData) => {
     const Blocks = jsonData?.Blocks || [];
     if (!Blocks.length) { setTables([]); return; }
 
-    // Build block map
     const fullMap = new Map(Blocks.map(b => [b.Id, b]));
     setBlocksMap(fullMap);
 
-    // Identify MERGED_CELLs and map children to parent
     const mergedBlocks = Blocks.filter(b => b.BlockType === 'MERGED_CELL');
     const localCellMerged = new Map();
     mergedBlocks.forEach(mb => {
@@ -41,7 +44,6 @@ function App() {
     });
     setCellMergedMap(localCellMerged);
 
-    // Text extraction utility
     const getText = (block) => {
       const rel = block.Relationships?.find(r => r.Type === 'CHILD');
       if (!rel) return '';
@@ -55,18 +57,15 @@ function App() {
       return seq.map(p => p.Text).join(' ');
     };
 
-    // Process each TABLE
     const tablesRaw = Blocks.filter(b => b.BlockType === 'TABLE');
     const parsed = tablesRaw.map(table => {
       const childRel = table.Relationships?.find(r => r.Type === 'CHILD');
       const cellIds = childRel?.Ids || [];
       if (!cellIds.length) return null;
 
-            // Synthetic merged cells
       const synthetic = mergedBlocks
         .filter(mb => mb.Relationships?.find(r => r.Type === 'CHILD')?.Ids.some(id => cellIds.includes(id)))
         .map(mb => {
-          // Gather text from each child CELL block
           const childRel = mb.Relationships?.find(r => r.Type === 'CHILD');
           const childIds = childRel?.Ids || [];
           const mergedText = childIds
@@ -86,11 +85,10 @@ function App() {
           };
         });
 
-      // Raw cells not in merged
       const mergedChildIds = new Set(mergedBlocks.flatMap(mb => mb.Relationships.find(r => r.Type === 'CHILD').Ids));
       const raw = cellIds
         .map(id => fullMap.get(id))
-        .filter(cb => cb.BlockType === 'CELL' && !mergedChildIds.has(cb.Id))
+        .filter(cb => cb && cb.BlockType === 'CELL' && !mergedChildIds.has(cb.Id))
         .map(cb => ({
           id: cb.Id,
           RowIndex: cb.RowIndex,
@@ -100,8 +98,8 @@ function App() {
           text: getText(cb) || ' '
         }));
 
-      // Combine and build grid
       const allCells = [...synthetic, ...raw];
+      if (allCells.length === 0) return null;
       const maxRow = Math.max(...allCells.map(c => c.RowIndex + c.rowSpan - 1));
       const maxCol = Math.max(...allCells.map(c => c.ColumnIndex + c.colSpan - 1));
       const grid = Array.from({ length: maxRow }, () => Array(maxCol).fill(null));
@@ -109,11 +107,15 @@ function App() {
       allCells.forEach(cell => {
         const r = cell.RowIndex - 1;
         const c = cell.ColumnIndex - 1;
-        grid[r][c] = { id: cell.id, rowSpan: cell.rowSpan, colSpan: cell.colSpan, text: cell.text };
-        for (let dr = 0; dr < cell.rowSpan; dr++) {
-          for (let dc = 0; dc < cell.colSpan; dc++) {
-            if (dr !== 0 || dc !== 0) {
-              grid[r + dr][c + dc] = { spanned: true };
+        if(grid[r]) {
+          grid[r][c] = { id: cell.id, rowSpan: cell.rowSpan, colSpan: cell.colSpan, text: cell.text };
+          for (let dr = 0; dr < cell.rowSpan; dr++) {
+            for (let dc = 0; dc < cell.colSpan; dc++) {
+              if (dr !== 0 || dc !== 0) {
+                if (grid[r + dr]) {
+                    grid[r + dr][c + dc] = { spanned: true };
+                }
+              }
             }
           }
         }
@@ -129,6 +131,23 @@ function App() {
   const handleBlockClick = (blockId) => {
     const root = cellMergedMap.get(blockId) || blockId;
     setSelectedBlockId(prev => prev === root ? null : root);
+
+    // --- SCROLL-TO-CELL LOGIC (from previous step) ---
+    setTimeout(() => {
+      const targetElement = document.getElementById(`cell-${root}`);
+      if (targetElement) {
+        targetElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+      }
+    }, 50);
+
+    // --- NEW ZOOM-TO-IMAGE LOGIC ---
+    if (transformComponentRef.current) {
+        const { zoomToElement } = transformComponentRef.current;
+        // The node ID for the bounding box div
+        const boundingBoxId = `bbox-${root}`;
+        // Use the library's zoomToElement function for a smooth, centered zoom
+        zoomToElement(boundingBoxId, 1.5, 200, 'easeOut');
+    }
   };
 
   // --- DRAW BOUNDING BOXES ---
@@ -148,7 +167,8 @@ function App() {
           height: `${BoundingBox.Height * 100}%`
         };
         return (
-          <div key={root} className={`bounding-box ${isSel ? 'selected' : ''}`} style={style} onClick={() => handleBlockClick(cell.Id)} />
+          // --- NEW ID ATTRIBUTE for the bounding box ---
+          <div id={`bbox-${root}`} key={root} className={`bounding-box ${isSel ? 'selected' : ''}`} style={style} onClick={() => handleBlockClick(cell.Id)} />
         );
       });
   };
@@ -167,12 +187,19 @@ function App() {
             <table className="results-table"><tbody>
               {table.grid.map((row, ri) => (
                 <tr key={ri}>
-                  {row.map((cell, ci) => {
+                  {row.map((cell) => {
                     if (!cell || cell.spanned) return null;
                     const root = cellMergedMap.get(cell.id) || cell.id;
                     const isSel = selectedBlockId === root;
                     return (
-                      <td key={cell.id} rowSpan={cell.rowSpan} colSpan={cell.colSpan} className={['cell', isSel ? 'selected-row' : '', visualize ? 'highlight-cell' : ''].join(' ')} onClick={() => handleBlockClick(cell.id)}>
+                      <td 
+                        id={`cell-${cell.id}`} 
+                        key={cell.id} 
+                        rowSpan={cell.rowSpan} 
+                        colSpan={cell.colSpan} 
+                        className={['cell', isSel ? 'selected-row' : '', visualize ? 'highlight-cell' : ''].join(' ')} 
+                        onClick={() => handleBlockClick(cell.id)}
+                      >
                         <div className="cell-content">{cell.text}</div>
                       </td>
                     );
@@ -220,7 +247,8 @@ function App() {
           <h2 className="section-title"><Eye size={20}/> Document Preview</h2>
           <div className="image-preview-wrapper">
             {imageUrl?
-              <TransformWrapper options={{limitToBounds:false}} pan={{velocity:true}} wheel={{step:0.2}} doubleClick={{disabled:true}} zoomAnimation={{animationTime:200}}>
+              // --- Pass the ref to TransformWrapper ---
+              <TransformWrapper ref={transformComponentRef} options={{limitToBounds:false}} pan={{velocity:true}} wheel={{step:0.2}} doubleClick={{disabled:true}} zoomAnimation={{animationTime:200}}>
                 {({zoomIn,zoomOut,resetTransform})=><>
                   <div className="zoom-controls"><button onClick={()=>zoomIn(0.2)}><ZoomIn size={18}/></button><button onClick={()=>zoomOut(0.2)}><ZoomOut size={18}/></button><button onClick={()=>resetTransform()}><RotateCcw size={18}/></button></div>
                   <TransformComponent wrapperClass="transform-wrapper"><img ref={imageRef} src={imageUrl} alt="Preview" className="preview-image"/>{renderBoundingBoxes()}</TransformComponent>

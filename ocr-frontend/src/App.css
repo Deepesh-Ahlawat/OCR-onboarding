@@ -356,6 +356,17 @@ body {
   color: #94a3b8;
 }
 
+/* Cell Styling */
+.results-table td.cell {
+  padding: 8px;
+  border: 1px solid #e2e8f0;
+  vertical-align: middle;
+  text-align: left;
+  white-space: nowrap;
+  /* NEW: Adds a margin when scrolling this element into view */
+  scroll-margin: 20px; 
+}
+
 /* Animation keyframes */
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
