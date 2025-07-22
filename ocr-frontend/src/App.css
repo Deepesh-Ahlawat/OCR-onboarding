@@ -14,185 +14,126 @@ body {
   background: #f8fafc;
 }
 
-/* Smooth scrolling */
-html {
-  scroll-behavior: smooth;
-}
-
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
   background: #f1f5f9;
-  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 4px;
+  background: #cbd5e1;
+  border-radius: 10px;
+  border: 2px solid #f1f5f9;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+  background: #94a3b8;
 }
 
-/* Animation keyframes */
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+
+/* --- App Layout --- */
+.App {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.App-header {
+  padding: 1rem 2rem;
+  background: white;
+  border-bottom: 1px solid #e2e8f0;
+  z-index: 10;
 }
 
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+.header-content {
+  max-width: 1600px;
+  margin: 0 auto;
 }
 
-@keyframes pulse {
-  0%, 100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.05);
-  }
+.header-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 1rem;
 }
 
-/* Utility classes */
-.animate-spin {
-  animation: spin 1s linear infinite;
+.controls {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
 }
 
-.animate-fade-in {
-  animation: fadeIn 0.6s ease-out;
+.App-main {
+  flex-grow: 1;
+  max-width: 1600px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 2rem;
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 2rem;
+  align-items: flex-start;
+  overflow: hidden;
 }
 
-.animate-slide-in {
-  animation: slideIn 0.4s ease-out;
-}
-
-.animate-pulse {
-  animation: pulse 2s infinite;
-}
-
-/* Enhanced button hover effects */
-button:not(:disabled):hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-}
-
-button:not(:disabled):active {
-  transform: translateY(0);
-}
-
-/* Focus states for accessibility */
-button:focus-visible,
-input:focus-visible {
-  outline: 2px solid #667eea;
-  outline-offset: 2px;
-}
-
-/* Enhanced table styles */
-.results-table {
-  border-collapse: separate;
-  border-spacing: 0;
+/* Panel Styling */
+.panel {
   background: white;
   border-radius: 12px;
-  overflow: hidden;
+  border: 1px solid #e2e8f0;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  margin-bottom: 2rem;
+  height: calc(100vh - 155px);
+  display: flex;
+  flex-direction: column;
 }
 
-.results-table th {
-  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+.section-title {
+  font-size: 1.125rem;
   font-weight: 600;
-  color: #374151;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-size: 0.875rem;
-  padding: 1rem;
-  border-bottom: 2px solid #e2e8f0;
-}
-
-.results-table td {
   padding: 1rem;
   border-bottom: 1px solid #e2e8f0;
-  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #334155;
+  flex-shrink: 0;
 }
 
-.results-table tbody tr:hover {
-  background-color: #f8fafc;
+/* --- Image Preview Section --- */
+.image-preview-wrapper {
+  position: relative;
+  flex-grow: 1;
+  overflow: hidden;
+  border-radius: 0 0 12px 12px;
 }
 
-.results-table tbody tr:last-child td {
-  border-bottom: none;
-}
-
-/* Enhanced input styles */
-.results-table input[type="text"] {
+.transform-wrapper {
   width: 100%;
-  padding: 0.5rem;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  background: transparent;
-  transition: all 0.2s ease;
+  height: 100%;
 }
 
-.results-table input[type="text"]:hover {
-  background-color: #f8fafc;
+.image-box-container {
+  position: relative;
+  width: 100%;
+  height: auto;
+  display: inline-block;
 }
 
-.results-table input[type="text"]:focus {
-  outline: none;
-  border: 1px solid #667eea;
-  background-color: #f0f8ff;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+.preview-image {
+  width: 100%;
 }
-
-/* Selected row styles */
-.selected-row {
-  background-color: #ecfdf5 !important;
-  border-left: 4px solid #10b981;
-}
-
-.selected-row input[type="text"] {
-  background-color: rgba(16, 185, 129, 0.05) !important;
-}
-
-/* Find and replace these rules in App.css */
 
 .bounding-box {
   position: absolute;
-  /* FIX: Thinner 1px border for better visibility */
-  border: 1px solid rgba(239, 68, 68, 0.9);
+  border: 2px solid rgba(239, 68, 68, 0.7);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.3);
   cursor: pointer;
   transition: all 0.2s ease;
-  border-radius: 2px; /* A slightly tighter radius */
-  /* FIX: A very subtle shadow instead of a thick border */
-  box-shadow: 0 0 3px rgba(239, 68, 68, 0.2);
+  border-radius: 2px;
 }
 
 .bounding-box:hover {
@@ -201,179 +142,9 @@ input:focus-visible {
 }
 
 .bounding-box.selected {
-  background-color: rgba(16, 185, 129, 0.3) !important;
-  /* FIX: Keep the selected border slightly thicker to stand out */
-  border: 2px solid #10b981 !important;
-  box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
-}
-
-/* Responsive design */
-@media (max-width: 1200px) {
-  .App-main {
-    grid-template-columns: 1fr;
-    gap: 2rem;
-  }
-  
-  .image-container {
-    max-width: 100%;
-  }
-  
-  .results-container {
-    width: 100%;
-  }
-}
-
-@media (max-width: 768px) {
-  .App-header {
-    padding: 1rem;
-  }
-  
-  .App-main {
-    padding: 1rem;
-    gap: 1.5rem;
-  }
-  
-  .controls {
-    flex-direction: column;
-    gap: 1rem;
-  }
-  
-  .controls button {
-    margin: 0;
-    width: 100%;
-    max-width: 300px;
-  }
-  
-  .results-table {
-    font-size: 0.875rem;
-  }
-  
-  .results-table th,
-  .results-table td {
-    padding: 0.75rem 0.5rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .App-header h1 {
-    font-size: 2rem;
-  }
-  
-  .results-table th,
-  .results-table td {
-    padding: 0.5rem 0.25rem;
-    font-size: 0.8rem;
-  }
-  
-  .results-table input[type="text"] {
-    padding: 0.375rem;
-    font-size: 0.8rem;
-  }
-}
-
-/* Loading states */
-.loading-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(255, 255, 255, 0.9);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: inherit;
-}
-
-/* Error and success states */
-.error-state {
-  padding: 2rem;
-  text-align: center;
-  color: #dc2626;
-  background: rgba(239, 68, 68, 0.05);
-  border-radius: 12px;
-  border: 1px solid rgba(239, 68, 68, 0.2);
-}
-
-.success-state {
-  padding: 2rem;
-  text-align: center;
-  color: #059669;
-  background: rgba(16, 185, 129, 0.05);
-  border-radius: 12px;
-  border: 1px solid rgba(16, 185, 129, 0.2);
-}
-
-/* Empty state */
-.empty-state {
-  padding: 3rem 2rem;
-  text-align: center;
-  color: #64748b;
-  font-size: 1.1rem;
-}
-
-.empty-state-icon {
-  margin-bottom: 1rem;
-  color: #94a3b8;
-}
-
-/* Accessibility improvements */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
-
-/* High contrast mode */
-@media (prefers-contrast: high) {
-  .bounding-box {
-    border-width: 3px;
-  }
-  
-  .selected-row {
-    border-left-width: 6px;
-  }
-}
-
-/* Print styles */
-@media print {
-  .controls,
-  .bounding-box {
-    display: none !important;
-  }
-  
-  .App-main {
-  max-width: 1600px; /* Make the main area slightly wider */
-  margin: 0 auto;
-  padding: 3rem 2rem;
-  display: grid;
-  /* Change this line to give the image more space */
-  grid-template-columns: 1.5fr 1fr; /* Image panel is 50% wider than results panel */
-  gap: 3rem;
-  align-items: flex-start;
-  }
-  
-  .image-container,
-  .results-container {
-    width: 100% !important;
-    max-width: none !important;
-  }
-  
-  .results-table {
-    box-shadow: none !important;
-    border: 1px solid #000;
-  }
-}
-
-/* === NEW STYLES for Zoom Controls and Image Wrapper === */
-
-.image-preview-wrapper {
-  position: relative;
-  width: 100%;
+  background-color: rgba(16, 185, 129, 0.2) !important;
+  border-color: #10b981 !important;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.5);
 }
 
 .zoom-controls {
@@ -386,83 +157,192 @@ input:focus-visible {
   background-color: rgba(255, 255, 255, 0.8);
   padding: 8px;
   border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .zoom-controls button {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border: none;
   background-color: #fff;
   color: #374151;
   border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s ease;
 }
 
-.zoom-controls button:hover {
-  background-color: #667eea;
-  color: white;
-  transform: scale(1.1);
-}
-
-.transform-wrapper {
-  width: 100%;
-  height: 100%;
-}
-
-/* Make bounding boxes relative to the image inside the zoom container */
-.preview-image {
+/* --- Results Section --- */
+.results-section .results-content {
+  flex-grow: 1;
+  overflow-y: auto;
   position: relative;
-  width: 100%;
 }
-
-.bounding-box {
-  /* This is a change: the box is positioned relative to its parent, the image */
-  position: absolute;
-  /* (rest of bounding-box styles are the same) */
-}
-
-/* Add this to the bottom of App.css */
-
-.image-box-container {
-  position: relative;
-  width: 100%;
-  height: auto;
-  display: inline-block; /* Ensures the container shrinks to the image size */
-}
-
-/* ADD THIS TO THE BOTTOM OF YOUR App.css FILE */
 
 .results-section .animate-fade-in {
-  /* This is the container for your form and table data */
-  /* Make it fill the available height, leaving room for the title */
-  height: calc(100vh - 180px); /* Adjust 180px as needed based on your header/title height */
-  
-  /* THIS IS THE CRITICAL FIX: Add a vertical scrollbar when content overflows */
-  overflow-y: auto; 
-  
-  padding: 0 1rem; /* Add some padding for better spacing */
+  padding: 1rem;
 }
 
-/* Add some spacing between the form and table sections */
 .data-section + .data-section {
-  margin-top: 2rem;
+  margin-top: 1.5rem;
 }
 
-/* Add some styling to the table inputs for better UX */
-.table-input {
-  background-color: #f8fafc;
+/* Table container styling */
+.table-container {
   border: 1px solid #e2e8f0;
-  padding: 0.5rem;
-  border-radius: 6px;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+  overflow-x: auto;
+}
+
+.results-table {
   width: 100%;
+  border-collapse: collapse;
 }
-.table-input:focus {
-  background-color: white;
-  border-color: #667eea;
-  outline: none;
+
+/* Cell Styling */
+.results-table td.cell {
+  padding: 8px;
+  border: 1px solid #e2e8f0;
+  vertical-align: middle;
+  text-align: left;
+  white-space: nowrap;
 }
+
+.cell-content {
+  display: inline-block;
+  padding: 4px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background-color: #f9fafb;
+  font-size: 0.9rem;
+}
+
+/* Selected row styling */
+.selected-row {
+  background-color: #d1fae5 !important;
+}
+
+/* --- Cell Visualization Styles --- */
+.cell-header-default .cell-content {
+  font-weight: 600;
+}
+
+.cell-type-data .cell-content {
+  background-color: #ffffff;
+  border-color: #e5e7eb;
+}
+
+.cell-type-column_header .cell-content {
+  background-color: #eef2ff;
+  border-color: #c7d2fe;
+  font-weight: 600;
+  color: #4338ca;
+}
+
+.cell-empty {
+  background-color: #f8fafc;
+}
+.cell-empty .cell-content {
+  background-color: transparent;
+  border-color: transparent;
+}
+
+
+/* Header and controls for tables */
+.table-header-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding: 0 0.5rem;
+}
+
+.toggle-control {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.toggle-control label {
+  font-size: 0.875rem;
+  color: #475569;
+  cursor: pointer;
+}
+.toggle-control input[type="checkbox"] {
+  cursor: pointer;
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+/* Buttons and Alerts */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-upload {
+  background-color: #f8fafc;
+  border-color: #cbd5e1;
+}
+.btn-upload:hover {
+  background-color: #f1f5f9;
+}
+.btn-analyze {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+.btn-analyze:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(118, 75, 162, 0.3);
+}
+.btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.alert {
+  padding: 0.75rem 1rem;
+  margin-top: 1rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.error-state {
+  background-color: #fee2e2;
+  color: #b91c1c;
+}
+.success-state {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+/* Empty/Loading States */
+.empty-state, .loading-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #64748b;
+  position: absolute;
+  width: 100%;
+  top: 0;
+  left: 0;
+}
+.empty-state-icon {
+  margin-bottom: 1rem;
+  color: #94a3b8;
+}
+
+/* Animation keyframes */
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.animate-spin { animation: spin 1s linear infinite; }
+.animate-fade-in { animation: fadeIn 0.5s ease-out; }

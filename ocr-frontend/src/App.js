@@ -1,20 +1,22 @@
 // src/App.js
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, FileText, Eye, AlertCircle, CheckCircle, Loader, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { Upload, FileText, Eye, AlertCircle, CheckCircle, Loader, ZoomIn, ZoomOut, RotateCcw, Table } from 'lucide-react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import './App.css';
 
 function App() {
-  // --- STATE AND REFS (No changes here) ---
+  // --- STATE AND REFS ---
   const [imageFile, setImageFile] = useState(null);
   const [imageUrl, setImageUrl] = useState('');
   const [textractData, setTextractData] = useState(null);
+  const [tables, setTables] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [selectedBlockId, setSelectedBlockId] = useState(null);
   const [success, setSuccess] = useState('');
-  
+  const [selectedBlockId, setSelectedBlockId] = useState(null);
+  const [visualize, setVisualize] = useState(false);
+
   const imageRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -24,7 +26,71 @@ function App() {
     };
   }, [imageUrl]);
 
-  // --- HANDLERS (No changes here) ---
+  // --- PARSING LOGIC ---
+  const parseAndRenderTables = (jsonData) => {
+    if (!jsonData || !jsonData.Blocks) {
+      setTables([]);
+      return;
+    }
+    try {
+      const { Blocks } = jsonData;
+      const blockMap = new Map(Blocks.map(b => [b.Id, b]));
+      const tableBlocks = Blocks.filter(b => b.BlockType === 'TABLE');
+      const getTextFromBlock = (block) => {
+        let text = '';
+        if (block?.Relationships) {
+          for (const rel of block.Relationships) {
+            if (rel.Type === 'CHILD') {
+              for (const childId of rel.Ids) {
+                const word = blockMap.get(childId);
+                if (word?.BlockType === 'WORD') {
+                  text += word.Text + ' ';
+                }
+              }
+            }
+          }
+        }
+        return text.trim();
+      };
+      const parsedTables = tableBlocks.map(tableBlock => {
+        const cellRelationships = tableBlock.Relationships?.find(r => r.Type === 'CHILD')?.Ids || [];
+        const cellBlocks = cellRelationships.map(id => blockMap.get(id)).filter(b => b && b.BlockType === 'CELL');
+        if (cellBlocks.length === 0) return null;
+        const maxRow = Math.max(...cellBlocks.map(c => c.RowIndex + (c.RowSpan || 1) - 1));
+        const maxCol = Math.max(...cellBlocks.map(c => c.ColumnIndex + (c.ColumnSpan || 1) - 1));
+        const tableGrid = Array(maxRow).fill(null).map(() => Array(maxCol).fill(null));
+        cellBlocks.forEach(cell => {
+          const rowIndex = cell.RowIndex - 1;
+          const colIndex = cell.ColumnIndex - 1;
+          const cellData = {
+            id: cell.Id,
+            text: getTextFromBlock(cell),
+            rowSpan: cell.RowSpan || 1,
+            colSpan: cell.ColumnSpan || 1,
+            confidence: cell.Confidence,
+            cellType: cell.RowIndex === 1 ? 'COLUMN_HEADER' : 'DATA',
+          };
+          for (let r = rowIndex; r < rowIndex + cellData.rowSpan; r++) {
+            for (let c = colIndex; c < colIndex + cellData.colSpan; c++) {
+              if (r === rowIndex && c === colIndex) {
+                tableGrid[r][c] = cellData;
+              } else {
+                tableGrid[r][c] = { spanned: true };
+              }
+            }
+          }
+        });
+        return { id: tableBlock.Id, grid: tableGrid, rowCount: maxRow, colCount: maxCol };
+      }).filter(Boolean);
+      setTables(parsedTables);
+    } catch (err) {
+      console.error("Failed to parse Textract JSON for tables:", err);
+      setError("Failed to parse table data from the response.");
+      setTables([]);
+    }
+  };
+
+  // --- HANDLERS ---
   const handleFileChange = (event) => {
     const file = event.target.files[0];
     if (file) {
@@ -32,6 +98,7 @@ function App() {
       if (imageUrl) URL.revokeObjectURL(imageUrl);
       setImageUrl(URL.createObjectURL(file));
       setTextractData(null);
+      setTables([]);
       setError('');
       setSuccess('');
       setSelectedBlockId(null);
@@ -48,53 +115,38 @@ function App() {
     setLoading(true);
     setError('');
     setSuccess('');
+    setTables([]);
     setSelectedBlockId(null);
-
     const formData = new FormData();
     formData.append('file', imageFile);
-
     try {
       const response = await fetch('http://127.0.0.1:5001/api/analyze', { method: 'POST', body: formData });
       const data = await response.json();
       if (!response.ok) throw new Error(`${data.type || 'Error'}: ${data.error || 'Unknown error'}`);
       setTextractData(data);
+      parseAndRenderTables(data);
       setSuccess('Document analyzed successfully!');
     } catch (err) {
       setError(`Analysis failed: ${err.message}`);
       setTextractData(null);
+      setTables([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleBlockClick = (blockId) => setSelectedBlockId(blockId);
-
-  // --- HELPER FUNCTION to get text from WORD blocks ---
-  const getTextFromBlock = (block, allBlocks) => {
-    let text = '';
-    if (block?.Relationships) {
-      block.Relationships.forEach(rel => {
-        if (rel.Type === 'CHILD') {
-          rel.Ids.forEach(childId => {
-            const word = allBlocks.find(b => b.Id === childId);
-            if (word?.BlockType === 'WORD') text += word.Text + ' ';
-          });
-        }
-      });
-    }
-    return text.trim();
+  const handleBlockClick = (blockId) => {
+    setSelectedBlockId(prevId => prevId === blockId ? null : blockId);
   };
 
-  // --- RENDERING LOGIC (The Important Updates are Here) ---
+  // --- RENDERING LOGIC ---
 
   const renderBoundingBoxes = () => {
     if (!textractData?.Blocks || !imageRef.current) return null;
-    
-    // We want to draw boxes for both Tables, Cells, and Key-Value sets
+    // Simplified to only draw boxes for tables and cells
     const blocksToDraw = textractData.Blocks.filter(b => 
-      b.Geometry && (b.BlockType === 'CELL' || b.BlockType === 'KEY_VALUE_SET' || b.BlockType === 'TABLE')
+      b.Geometry && (b.BlockType === 'CELL' || b.BlockType === 'TABLE')
     );
-
     return blocksToDraw.map((block) => {
       const { BoundingBox } = block.Geometry;
       const isSelected = selectedBlockId === block.Id;
@@ -102,114 +154,69 @@ function App() {
       return <div key={block.Id} className={`bounding-box ${isSelected ? 'selected' : ''}`} style={boxStyle} onClick={() => handleBlockClick(block.Id)} />;
     });
   };
-
-  // --- NEW: Correct implementation for Key-Value Pairs ---
-  const renderFormData = () => {
-    if (!textractData?.Blocks) return null;
-    const allBlocks = textractData.Blocks;
-
-    // 1. Find all KEY blocks
-    const keyBlocks = allBlocks.filter(b => b.BlockType === 'KEY_VALUE_SET' && b.EntityTypes.includes('KEY'));
-    
-    if (keyBlocks.length === 0) return null;
-
-    return (
-      <div className="data-section">
-        <h3 className="section-title"><FileText size={20} /> Extracted Form Data</h3>
-        <table className="results-table">
-          <thead><tr><th>Key</th><th>Value</th></tr></thead>
-          <tbody>
-            {keyBlocks.map(keyBlock => {
-              // 2. For each KEY, find its associated VALUE block via relationships
-              const valueBlock = keyBlock.Relationships?.find(r => r.Type === 'VALUE')?.Ids.map(id => allBlocks.find(b => b.Id === id))[0];
-              
-              // 3. Extract text from both KEY and VALUE blocks
-              const keyText = getTextFromBlock(keyBlock, allBlocks);
-              const valueText = valueBlock ? getTextFromBlock(valueBlock, allBlocks) : '';
-
-              const isSelected = selectedBlockId === keyBlock.Id || (valueBlock && selectedBlockId === valueBlock.Id);
-
-              return (
-                <tr key={keyBlock.Id} className={isSelected ? 'selected-row' : ''} onClick={() => handleBlockClick(keyBlock.Id)}>
-                  <td>{keyText}</td>
-                  <td><input type="text" defaultValue={valueText} /></td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    );
-  };
   
-// --- In App.js, REPLACE your entire renderTableData function with this one ---
+  const renderAllTables = () => {
+    if (tables.length === 0) return null;
 
-  const renderTableData = () => {
-    if (!textractData?.Blocks) return null;
-    const allBlocks = textractData.Blocks;
-
-    // 1. Find all TABLE blocks
-    const tableBlocks = allBlocks.filter(b => b.BlockType === 'TABLE');
-    if (tableBlocks.length === 0) return null;
-
-    // --- START OF THE FIX ---
-    // 2. Identify the "main" table. We'll assume it's the one with the most cells.
-    // This prevents rendering smaller, form-like tables that might also be detected.
-    const mainTable = tableBlocks.reduce((largest, current) => {
-        const largestCellCount = largest.Relationships?.find(r => r.Type === 'CHILD')?.Ids.length || 0;
-        const currentCellCount = current.Relationships?.find(r => r.Type === 'CHILD')?.Ids.length || 0;
-        return currentCellCount > largestCellCount ? current : largest;
-    }, tableBlocks[0]); // Start with the first table as the initial largest
-    // --- END OF THE FIX ---
-
-    // 3. Find all CELL blocks that are children of ONLY the main table
-    const cellIds = mainTable.Relationships?.find(r => r.Type === 'CHILD')?.Ids || [];
-    const cellBlocks = cellIds.map(id => allBlocks.find(b => b.Id === id)).filter(Boolean);
-    if (cellBlocks.length === 0) return null;
-
-    // 4. Group cells by RowIndex
-    const rows = cellBlocks.reduce((acc, cell) => {
-      const rowIndex = cell.RowIndex;
-      (acc[rowIndex] = acc[rowIndex] || []).push(cell);
-      return acc;
-    }, {});
-
-    // 5. Render the table structure
     return (
       <div className="data-section">
-        <h3 className="section-title"><Eye size={20} /> Extracted Table Data</h3>
-        <table key={mainTable.Id} className="results-table">
-          <tbody>
-            {Object.keys(rows)
-              .sort((a, b) => Number(a) - Number(b)) // Sort rows numerically
-              .map(rowIndex => (
-                <tr key={rowIndex}>
-                  {rows[rowIndex]
-                    .sort((a, b) => a.ColumnIndex - b.ColumnIndex) // Sort cells by column
-                    .map(cell => {
-                      const cellText = getTextFromBlock(cell, allBlocks);
-                      const isSelected = selectedBlockId === cell.Id;
+        <div className="table-header-controls">
+            <h3 className="section-title"><Table size={20} /> Extracted Table Data ({tables.length})</h3>
+            <div className="toggle-control">
+                <input
+                    type="checkbox"
+                    id="visualize-toggle"
+                    checked={visualize}
+                    onChange={(e) => setVisualize(e.target.checked)}
+                />
+                <label htmlFor="visualize-toggle">Color-coded View</label>
+            </div>
+        </div>
+        {tables.map(table => (
+          <div key={table.id} className="table-container">
+            <table className="results-table">
+              <tbody>
+                {table.grid.map((row, rowIndex) => (
+                  <tr key={rowIndex}>
+                    {row.map((cell, colIndex) => {
+                      if (cell?.spanned) return null;
+                      if (!cell) return <td key={colIndex} className="cell-empty"></td>;
+
+                      const isSelected = selectedBlockId === cell.id;
+                      const cellClasses = ['cell'];
+                      if (isSelected) cellClasses.push('selected-row');
+
+                      if (visualize) {
+                          cellClasses.push(`cell-type-${cell.cellType.toLowerCase()}`);
+                      } else {
+                          if(cell.cellType === 'COLUMN_HEADER') cellClasses.push('cell-header-default');
+                      }
+
                       return (
                         <td
-                          key={cell.Id}
-                          className={isSelected ? 'selected-row' : ''}
-                          onClick={() => handleBlockClick(cell.Id)}
-                          colSpan={cell.ColumnSpan || 1}
-                          rowSpan={cell.RowSpan || 1}
+                          key={cell.id}
+                          className={cellClasses.join(' ')}
+                          colSpan={cell.colSpan}
+                          rowSpan={cell.rowSpan}
+                          onClick={() => handleBlockClick(cell.id)}
                         >
-                          <input type="text" defaultValue={cellText} className="table-input" />
+                          <div className="cell-content">
+                            {cell.text || '\u00A0'}
+                          </div>
                         </td>
                       );
                     })}
-                </tr>
-              ))}
-          </tbody>
-        </table>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
       </div>
     );
   };
   
-  // --- MAIN COMPONENT JSX (No changes here) ---
+  // --- MAIN COMPONENT JSX ---
   return (
     <div className="App">
       <header className="App-header">
@@ -253,10 +260,13 @@ function App() {
           </div>
         </div>
         <div className="panel results-section">
-           <h2 className="section-title"><FileText size={20} /> Extracted Data</h2>
-          {loading ? (<div className="loading-overlay"><Loader size={40} className="animate-spin" /></div>) : 
-           textractData ? (<div className="animate-fade-in">{renderFormData()}{renderTableData()}</div>) : 
-           (<div className="empty-state"><Eye size={40} className="empty-state-icon"/> <p>Results will appear here after analysis.</p></div>)}
+           {/* The title here is now static as it only shows table data */}
+           <h2 className="section-title"><Table size={20} /> Extracted Data</h2>
+           <div className="results-content">
+            {loading ? (<div className="loading-overlay"><Loader size={40} className="animate-spin" /></div>) : 
+            textractData ? (<div className="animate-fade-in">{renderAllTables()}</div>) : 
+            (<div className="empty-state"><Eye size={40} className="empty-state-icon"/> <p>Table results will appear here after analysis.</p></div>)}
+           </div>
         </div>
       </main>
     </div>

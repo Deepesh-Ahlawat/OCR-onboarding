@@ -236,18 +236,6 @@ def register_routes(app: Flask, config: Config):
             try:
                 response = analyze_document_with_textract(image_bytes, config.AWS_REGION)
                 logger.info("Document analysis completed successfully")
-                try:
-                    # Generate a unique filename to prevent overwriting
-                    filename = f"response_{uuid.uuid4()}.json"
-                    
-                    # Write the full, pretty-printed JSON response to the file
-                    with open(filename, 'w', encoding='utf-8') as f:
-                        json.dump(response, f, indent=2)
-                    
-                    logger.info(f"--- SUCCESS: Full response saved to file: {filename} ---")
-                
-                except Exception as e:
-                    logger.error(f"--- FAILED to save response to file: {e} ---")
                 return jsonify(response)
                 
             except ClientError as e:
