@@ -5,6 +5,29 @@ import { Upload, FileText, Eye, AlertCircle, CheckCircle, Loader, ZoomIn, ZoomOu
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import './App.css';
 
+// --- HELPER FUNCTION: Defined once at a higher scope to be reusable ---
+const getText = (block, fullMap) => {
+    if (!block) return '';
+    const childRel = block.Relationships?.find(r => r.Type === 'CHILD');
+    if (!childRel) return '';
+
+    const childBlocks = childRel.Ids.map(id => fullMap.get(id)).filter(Boolean);
+    const lineBlocks = childBlocks.filter(b => b.BlockType === 'LINE');
+
+    if (!lineBlocks.length) {
+        const wordBlocks = childBlocks.filter(b => b.BlockType === 'WORD');
+        if (wordBlocks.length > 0) {
+            wordBlocks.sort((a,b) => a.Geometry.BoundingBox.Left - b.Geometry.BoundingBox.Left);
+            return wordBlocks.map(w => w.Text).join(' ');
+        }
+        return '';
+    }
+
+    lineBlocks.sort((a, b) => a.Geometry.BoundingBox.Top - b.Geometry.BoundingBox.Top);
+    return lineBlocks.map(line => line.Text).join(' ');
+};
+
+
 function App() {
   // --- STATE AND REFS ---
   const [imageFile, setImageFile] = useState(null);
@@ -29,7 +52,7 @@ function App() {
   // Cleanup URL
   useEffect(() => () => { if (imageUrl) URL.revokeObjectURL(imageUrl); }, [imageUrl]);
 
-  // --- PARSE & BUILD TABLES (No changes) ---
+  // --- PARSE & BUILD TABLES ---
   const parseAndRenderTables = (jsonData) => {
     const Blocks = jsonData?.Blocks || [];
     if (!Blocks.length) { setTables([]); return; }
@@ -45,19 +68,6 @@ function App() {
     });
     setCellMergedMap(localCellMerged);
 
-    const getText = (block) => {
-      const rel = block.Relationships?.find(r => r.Type === 'CHILD');
-      if (!rel) return '';
-      const parts = rel.Ids.map(id => fullMap.get(id)).filter(Boolean);
-      const lines = parts.filter(p => p.BlockType === 'LINE');
-      const seq = lines.length ? lines : parts.filter(p => p.BlockType === 'WORD');
-      seq.sort((a, b) =>
-        a.Geometry.BoundingBox.Top - b.Geometry.BoundingBox.Top ||
-        a.Geometry.BoundingBox.Left - b.Geometry.BoundingBox.Left
-      );
-      return seq.map(p => p.Text).join(' ');
-    };
-
     const tablesRaw = Blocks.filter(b => b.BlockType === 'TABLE');
     const parsed = tablesRaw.map(table => {
       const childRel = table.Relationships?.find(r => r.Type === 'CHILD');
@@ -72,7 +82,7 @@ function App() {
           const mergedText = childIds
             .map(cid => {
               const childBlock = fullMap.get(cid);
-              return childBlock ? getText(childBlock) : '';
+              return childBlock ? getText(childBlock, fullMap) : '';
             })
             .filter(t => t.trim().length > 0)
             .join(' ');
@@ -96,7 +106,7 @@ function App() {
           ColumnIndex: cb.ColumnIndex,
           rowSpan: cb.RowSpan || 1,
           colSpan: cb.ColumnSpan || 1,
-          text: getText(cb) || ' '
+          text: getText(cb, fullMap) || ' '
         }));
 
       const allCells = [...synthetic, ...raw];
@@ -177,12 +187,10 @@ function App() {
     setSuccess('');
     setError('');
 
-    // --- THIS IS THE DEFINITIVE FIX ---
     const payload = Array.from(sensorTags.entries())
       .filter(([, tag]) => tag.trim() !== "")
       .map(([blockId, sensorTag]) => {
         
-        // Find the cell's text from the already-processed `tables` state
         let cellText = '';
         for (const table of tables) {
           for (const row of table.grid) {
@@ -197,7 +205,7 @@ function App() {
 
         return {
           blockId: blockId,
-          cellText: cellText.trim(), // Use the text found in the state
+          cellText: cellText.trim(),
           sensorTag: sensorTag
         };
       });
@@ -230,10 +238,12 @@ function App() {
     return Array.from(uniqueRootBlocks.values()).map(({ originalCellId, rootBlock }) => {
       const { BoundingBox } = rootBlock.Geometry;
       const isSel = selectedBlockId === rootBlock.Id;
+      // --- THIS IS THE FIX ---
+      // Changed Bounding.Height to BoundingBox.Height
       const style = { top: `${BoundingBox.Top*100}%`, left: `${BoundingBox.Left*100}%`, width: `${BoundingBox.Width*100}%`, height: `${BoundingBox.Height*100}%`};
       
       return (
-        <div id={`bbox-${rootBlock.Id}`} key={rootBlock.Id} className={`bounding-box ${isSel ? 'selected' : ''} `} style={style} onClick={() => handleBlockClick(originalCellId)} />
+        <div id={`bbox-${rootBlock.Id}`} key={rootBlock.Id} className={`bounding-box ${isSel ? 'selected' : ''}`} style={style} onClick={() => handleBlockClick(originalCellId)} />
       );
     });
   };
