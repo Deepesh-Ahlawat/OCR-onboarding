@@ -63,7 +63,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helv
 .cell-header-default .cell-content { font-weight: 600; }
 .merged-cell .cell-content { display: block; background-color: #dbeafe; border-color: #bfdbfe; color: #1e40af; font-weight: 600; text-align: center; padding: 8px; }
 .table-header-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-shrink: 0; }
-.controls-right { display: flex; align-items: center; gap: 1rem; }
 
 /* --- Buttons and Alerts --- */
 .btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border: 1px solid transparent; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
@@ -77,18 +76,25 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helv
 .btn-add:hover { background-color: #1d4ed8; }
 .btn-cancel { background-color: #f1f5f9; color: #475569; border-color: #e2e8f0;}
 .btn-cancel:hover { background-color: #e2e8f0; }
-.btn.disabled, .btn-save:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+.btn-annotate { background-color: #f1f5f9; color: #475569; border-color: #e2e8f0; font-size: 0.875rem; padding: 0.4rem 0.8rem;}
+.btn-annotate:hover:not(:disabled) { background-color: #e2e8f0; }
+.btn.disabled, .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; background-color: #e2e8f0; background-image: none; color: #94a3b8; border-color: #e2e8f0;}
 .error-state { background-color: #fee2e2; color: #b91c1c; }
 .success-state { background-color: #dcfce7; color: #166534; }
 
-/* --- Custom Cells Section --- */
-.custom-cells-section { margin-top: 1.5rem; border-top: 1px solid #e2e8f0; padding-top: 1.5rem; }
-.custom-cells-title { font-size: 1rem; font-weight: 600; color: #475569; margin-bottom: 0.5rem; }
+/* --- Custom & Annotated Cells Section --- */
+.custom-cells-section, .annotated-results-section { margin-top: 1.5rem; border-top: 1px solid #e2e8f0; padding-top: 1.5rem; }
+.custom-cells-title, .annotated-title { font-size: 1rem; font-weight: 600; color: #475569; margin-bottom: 1rem; }
 .custom-table th, .custom-table td { padding: 0.75rem; font-size: 0.875rem; }
 .custom-table th { background-color: #f8fafc; text-align: left; }
 .delete-custom-btn { background: transparent; border: none; color: #ef4444; cursor: pointer; padding: 2px; display: flex; align-items: center; justify-content: center; border-radius: 4px; }
 .delete-custom-btn:hover { background-color: #fee2e2; }
 .datatype-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; background-color: #f1f5f9; color: #475569; font-family: monospace; font-size: 0.8rem; }
+.annotated-item { display: grid; grid-template-columns: 150px 1fr; gap: 1rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+.annotated-image-preview img { width: 100%; border-radius: 4px; border: 1px solid #e2e8f0; }
+.mini-table { font-size: 0.8rem; border-collapse: collapse; width: 100%; }
+.mini-table td { border: 1px solid #e2e8f0; padding: 0.25rem 0.5rem; }
+.no-data-found { font-style: italic; color: #64748b; }
 
 /* --- Modal Styles --- */
 .modal-backdrop { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(15, 23, 42, 0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; animation: fadeIn 0.3s ease; }
@@ -99,62 +105,27 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helv
 .form-group input { width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 1rem; }
 .form-group input:focus { outline: none; border-color: #4f46e5; box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2); }
 .form-actions { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 2rem; }
-.radio-group { display: flex; gap: 1.5rem; align-items: center; }
-.radio-group label { display: flex; align-items: center; gap: 0.5rem; font-weight: normal; }
-.radio-group {
-  display: flex;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  overflow: hidden;
-}
+.radio-group { display: flex; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; }
+.radio-group label { flex: 1; position: relative; text-align: center; padding: 0.5rem 1rem; cursor: pointer; color: #475569; background-color: #f8fafc; transition: background-color 0.2s ease; font-weight: 500; font-size: 0.875rem; }
+.radio-group label:not(:last-child) { border-right: 1px solid #cbd5e1; }
+.radio-group label:hover { background-color: #f1f5f9; }
+.radio-group input[type="radio"] { position: absolute; opacity: 0; width: 0; height: 0; }
+.radio-label-text { display: block; }
+.radio-group input[type="radio"]:checked + .radio-label-text { color: white; }
+.radio-group label:has(input:checked) { background-color: #4f46e5; color: white; }
 
-.radio-group label {
-  flex: 1; /* Make both labels take up equal space */
-  position: relative; /* Needed for positioning the hidden input */
-  text-align: center;
-  padding: 0.5rem 1rem;
-  cursor: pointer;
-  color: #475569;
-  background-color: #f8fafc;
-  transition: background-color 0.2s ease;
-  font-weight: 500;
-  font-size: 0.875rem;
-}
+/* --- Annotation Specific Styles --- */
+.image-section.annotating .image-preview-wrapper { position: relative; }
+.annotation-banner { position: absolute; top: 0; left: 0; right: 0; background: rgba(15, 23, 42, 0.85); color: white; z-index: 30; padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center; }
+.annotation-banner p { font-weight: 500; }
+.modal-backdrop-light { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(248, 250, 252, 0.8); display: flex; align-items: center; justify-content: center; z-index: 900; }
+.annotation-confirm-dialog { background: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
+.annotation-confirm-dialog h4 { font-size: 1.125rem; color: #1e293b; }
+.annotation-confirm-dialog img { max-width: 300px; max-height: 200px; border: 1px solid #e2e8f0; border-radius: 8px; }
+.btn-retry { background-color: #f1f5f9; color: #475569; border-color: #e2e8f0; }
+.btn-retry:hover { background-color: #e2e8f0; }
 
-.radio-group label:not(:last-child) {
-  border-right: 1px solid #cbd5e1;
-}
 
-.radio-group label:hover {
-  background-color: #f1f5f9;
-}
-
-/* Hide the actual radio button */
-.radio-group input[type="radio"] {
-  position: absolute;
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-/* Style the label's text span */
-.radio-label-text {
-  display: block;
-}
-
-/* This is the key: style the span when the hidden radio button is checked */
-.radio-group input[type="radio"]:checked + .radio-label-text {
-  color: white;
-}
-
-/* We also need to change the label's background */
-.radio-group input[type="radio"]:checked {
-  background-color: #4f46e5 !important;
-}
-.radio-group label:has(input:checked) {
-    background-color: #4f46e5;
-    color: white;
-}
 
 /* Empty/Loading States */
 .empty-state, .loading-overlay { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #64748b; position: absolute; width: 100%; top: 0; left: 0; }
