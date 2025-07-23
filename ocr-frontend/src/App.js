@@ -1,7 +1,8 @@
 // src/App.js
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, FileText, Eye, AlertCircle, CheckCircle, Loader, ZoomIn, ZoomOut, RotateCcw, Table, Save, Tag } from 'lucide-react';
+// --- Import the new X icon ---
+import { Upload, FileText, Eye, AlertCircle, CheckCircle, Loader, ZoomIn, ZoomOut, RotateCcw, Table, Save, Tag, X } from 'lucide-react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import './App.css';
 
@@ -112,7 +113,7 @@ function App() {
     setTables(parsed);
   }
   
-  // --- EVENT HANDLERS (No changes) ---
+  // --- EVENT HANDLERS ---
   const handleBlockClick = (blockId) => {
     const root = cellMergedMap.get(blockId) || blockId;
     setSelectedBlockId(prev => prev === root ? null : root);
@@ -128,6 +129,7 @@ function App() {
         zoomToElement(boundingBoxId, 1.5, 200, 'easeOut');
     }
   };
+
   const resetState = () => { setTextractData(null); setTables([]); setError(''); setSuccess(''); setSelectedBlockId(null); setSensorTags(new Map()); setShowCoverage(false); }
   const onFileChange = e => { const f = e.target.files[0]; if (!f) return; setImageFile(f); if (imageUrl) URL.revokeObjectURL(imageUrl); setImageUrl(URL.createObjectURL(f)); resetState(); };
   const onUpload = () => fileInputRef.current?.click();
@@ -144,16 +146,26 @@ function App() {
       setSuccess('Analysis successful');
     } catch (e) { setError(e.message); } finally { setLoading(false); }
   };
+  
   const handleTagChange = (cellId, newTag) => {
     const newTags = new Map(sensorTags);
     newTags.set(cellId, newTag);
     setSensorTags(newTags);
   };
+  
   const handleTagInputKeyDown = (e) => {
     if (e.key === 'Enter' || e.key === 'Escape') {
       setActiveTaggingCell(null);
     }
   };
+
+  // --- NEW Delete Tag Handler ---
+  const handleDeleteTag = (cellId) => {
+    const newTags = new Map(sensorTags);
+    newTags.delete(cellId);
+    setSensorTags(newTags);
+  };
+  
   const handleSaveTags = async () => {
     setIsSaving(true);
     setSuccess('');
@@ -200,13 +212,9 @@ function App() {
     return Array.from(uniqueRootBlocks.values()).map(({ originalCellId, rootBlock }) => {
       const { BoundingBox } = rootBlock.Geometry;
       const isSel = selectedBlockId === rootBlock.Id;
-      const style = { top: `${BoundingBox.Top*100}%`, left: `${BoundingBox.Left*100}%`, width: `${BoundingBox.Width*100}%`, height: `${BoundingBox.Height*100}%`};
-      
-      // --- THIS IS THE LOGIC CHANGE ---
-      // Check if the root block has a non-empty tag.
       const hasTag = sensorTags.has(rootBlock.Id) && sensorTags.get(rootBlock.Id).trim() !== '';
       const boxClasses = `bounding-box ${isSel ? 'selected' : ''} ${showCoverage ? 'coverage-visible' : ''} ${hasTag ? 'tagged' : ''}`;
-      
+      const style = { top: `${BoundingBox.Top*100}%`, left: `${BoundingBox.Left*100}%`, width: `${BoundingBox.Width*100}%`, height: `${BoundingBox.Height*100}%`};
       return (
         <div id={`bbox-${rootBlock.Id}`} key={rootBlock.Id} className={boxClasses} style={style} onClick={() => handleBlockClick(originalCellId)} />
       );
@@ -267,7 +275,18 @@ function App() {
                                 <span className="cell-text">{cell.text}</span>
                                 {sensorTags.has(cell.id) && sensorTags.get(cell.id) &&
                                     <span className="sensor-tag-badge">
-                                        <Tag size={12} /> {sensorTags.get(cell.id)}
+                                        <Tag size={12} /> 
+                                        {sensorTags.get(cell.id)}
+                                        {/* --- NEW Delete Button --- */}
+                                        <button 
+                                          className="delete-tag-btn"
+                                          onClick={(e) => {
+                                            e.stopPropagation(); // Prevent cell click
+                                            handleDeleteTag(cell.id);
+                                          }}
+                                        >
+                                          <X size={12}/>
+                                        </button>
                                     </span>
                                 }
                             </div>

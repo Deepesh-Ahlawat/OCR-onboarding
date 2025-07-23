@@ -110,6 +110,43 @@ body {
     background-color: rgba(239, 68, 68, 0.8); 
 }
 
+/* --- Add these rules to the end of App.css --- */
+
+.sensor-tag-badge {
+    /* Make the badge a flex container to align the new button */
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background-color: #e0e7ff;
+    color: #4338ca;
+    padding: 2px 2px 2px 6px; /* Adjust padding for the button */
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    max-width: fit-content;
+}
+
+.delete-tag-btn {
+    background-color: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    color: #4338ca; /* Same color as badge text */
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.delete-tag-btn:hover {
+    background-color: #c7d2fe;
+    color: #3730a3;
+}
+
 
 .zoom-controls { position: absolute; top: 10px; right: 10px; z-index: 20; display: flex; gap: 8px; background-color: rgba(255, 255, 255, 0.8); padding: 8px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
 .zoom-controls button { 
