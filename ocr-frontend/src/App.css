@@ -70,6 +70,46 @@ body {
     background-color: rgba(16, 185, 129, 0.5) !important; 
 }
 
+.bounding-box { position: absolute; border: 1.5px solid rgba(239, 68, 68, 0.7); cursor: pointer; transition: all 0.2s ease; border-radius: 2px; }
+.bounding-box:hover { background-color: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 1); }
+
+
+/* --- NEW: Tagged Bounding Box Styling --- */
+.bounding-box.tagged {
+  /* This is the light blue confirmation color */
+  border-color: rgb(0 97 255);
+  border-width: 2.5px;
+}
+.bounding-box.tagged:hover {
+  background-color: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 1);
+}
+.bounding-box.tagged.coverage-visible {
+  background-color: rgba(59, 130, 246, 0.3);
+}
+.bounding-box.tagged.coverage-visible:hover {
+  background-color: rgba(59, 130, 246, 0.4);
+}
+
+
+/* --- Selected Styling (ensure it overrides everything) --- */
+.bounding-box.selected { 
+  background-color: rgba(16, 185, 129, 0.3) !important; 
+  border-color: #10b981 !important; 
+}
+.bounding-box.selected.coverage-visible {
+  background-color: rgba(16, 185, 129, 0.5) !important;
+}
+
+
+/* --- Coverage View Styling --- */
+.bounding-box.coverage-visible {
+    background-color: rgba(239, 68, 68, 0.7); 
+}
+.bounding-box.coverage-visible:hover {
+    background-color: rgba(239, 68, 68, 0.8); 
+}
+
 
 .zoom-controls { position: absolute; top: 10px; right: 10px; z-index: 20; display: flex; gap: 8px; background-color: rgba(255, 255, 255, 0.8); padding: 8px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
 .zoom-controls button { 

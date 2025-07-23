@@ -25,7 +25,7 @@ const getText = (block, fullMap) => {
 };
 
 function App() {
-  // --- STATE AND REFS ---
+  // --- STATE AND REFS (No changes) ---
   const [imageFile, setImageFile] = useState(null);
   const [imageUrl, setImageUrl] = useState('');
   const [textractData, setTextractData] = useState(null);
@@ -40,10 +40,7 @@ function App() {
   const [sensorTags, setSensorTags] = useState(new Map());
   const [activeTaggingCell, setActiveTaggingCell] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
-  
-  // --- NEW STATE for Coverage View ---
   const [showCoverage, setShowCoverage] = useState(false);
-
 
   const imageRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -56,10 +53,8 @@ function App() {
   const parseAndRenderTables = (jsonData) => {
     const Blocks = jsonData?.Blocks || [];
     if (!Blocks.length) { setTables([]); return; }
-
     const fullMap = new Map(Blocks.map(b => [b.Id, b]));
     setBlocksMap(fullMap);
-
     const mergedBlocks = Blocks.filter(b => b.BlockType === 'MERGED_CELL');
     const localCellMerged = new Map();
     mergedBlocks.forEach(mb => {
@@ -67,13 +62,11 @@ function App() {
       rel?.Ids.forEach(id => localCellMerged.set(id, mb.Id));
     });
     setCellMergedMap(localCellMerged);
-
     const tablesRaw = Blocks.filter(b => b.BlockType === 'TABLE');
     const parsed = tablesRaw.map(table => {
       const childRel = table.Relationships?.find(r => r.Type === 'CHILD');
       const cellIds = childRel?.Ids || [];
       if (!cellIds.length) return null;
-
       const synthetic = mergedBlocks
         .filter(mb => mb.Relationships?.find(r => r.Type === 'CHILD')?.Ids.some(id => cellIds.includes(id)))
         .map(mb => {
@@ -86,35 +79,18 @@ function App() {
             })
             .filter(t => t.trim().length > 0)
             .join(' ');
-          return {
-            id: mb.Id,
-            RowIndex: mb.RowIndex,
-            ColumnIndex: mb.ColumnIndex,
-            rowSpan: mb.RowSpan || 1,
-            colSpan: mb.ColumnSpan || 1,
-            text: mergedText || ' '
-          };
+          return { id: mb.Id, RowIndex: mb.RowIndex, ColumnIndex: mb.ColumnIndex, rowSpan: mb.RowSpan || 1, colSpan: mb.ColumnSpan || 1, text: mergedText || ' ' };
         });
-
       const mergedChildIds = new Set(mergedBlocks.flatMap(mb => mb.Relationships.find(r => r.Type === 'CHILD').Ids));
       const raw = cellIds
         .map(id => fullMap.get(id))
         .filter(cb => cb && cb.BlockType === 'CELL' && !mergedChildIds.has(cb.Id))
-        .map(cb => ({
-          id: cb.Id,
-          RowIndex: cb.RowIndex,
-          ColumnIndex: cb.ColumnIndex,
-          rowSpan: cb.RowSpan || 1,
-          colSpan: cb.ColumnSpan || 1,
-          text: getText(cb, fullMap) || ' '
-        }));
-
+        .map(cb => ({ id: cb.Id, RowIndex: cb.RowIndex, ColumnIndex: cb.ColumnIndex, rowSpan: cb.RowSpan || 1, colSpan: cb.ColumnSpan || 1, text: getText(cb, fullMap) || ' ' }));
       const allCells = [...synthetic, ...raw];
       if (allCells.length === 0) return null;
       const maxRow = Math.max(...allCells.map(c => c.RowIndex + c.rowSpan - 1));
       const maxCol = Math.max(...allCells.map(c => c.ColumnIndex + c.colSpan - 1));
       const grid = Array.from({ length: maxRow }, () => Array(maxCol).fill(null));
-
       allCells.forEach(cell => {
         const r = cell.RowIndex - 1;
         const c = cell.ColumnIndex - 1;
@@ -131,53 +107,30 @@ function App() {
           }
         }
       });
-
       return { id: table.Id, grid };
     }).filter(Boolean);
-
     setTables(parsed);
   }
   
-  // --- EVENT HANDLERS ---
+  // --- EVENT HANDLERS (No changes) ---
   const handleBlockClick = (blockId) => {
     const root = cellMergedMap.get(blockId) || blockId;
     setSelectedBlockId(prev => prev === root ? null : root);
-
     setTimeout(() => {
       const targetElement = document.getElementById(`cell-${root}`);
       if (targetElement) {
         targetElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
       }
     }, 50);
-
     if (transformComponentRef.current) {
         const { zoomToElement } = transformComponentRef.current;
         const boundingBoxId = `bbox-${root}`;
         zoomToElement(boundingBoxId, 1.5, 200, 'easeOut');
     }
   };
-
-  const resetState = () => {
-    setTextractData(null); 
-    setTables([]); 
-    setError(''); 
-    setSuccess(''); 
-    setSelectedBlockId(null); 
-    setSensorTags(new Map());
-    setShowCoverage(false);
-  }
-
-  const onFileChange = e => { 
-    const f = e.target.files[0]; 
-    if (!f) return; 
-    setImageFile(f); 
-    if (imageUrl) URL.revokeObjectURL(imageUrl); 
-    setImageUrl(URL.createObjectURL(f)); 
-    resetState();
-  };
-  
+  const resetState = () => { setTextractData(null); setTables([]); setError(''); setSuccess(''); setSelectedBlockId(null); setSensorTags(new Map()); setShowCoverage(false); }
+  const onFileChange = e => { const f = e.target.files[0]; if (!f) return; setImageFile(f); if (imageUrl) URL.revokeObjectURL(imageUrl); setImageUrl(URL.createObjectURL(f)); resetState(); };
   const onUpload = () => fileInputRef.current?.click();
-  
   const onAnalyze = async () => {
     if (!imageFile) { setError('Select a document first.'); return; }
     setLoading(true);
@@ -191,24 +144,20 @@ function App() {
       setSuccess('Analysis successful');
     } catch (e) { setError(e.message); } finally { setLoading(false); }
   };
-  
   const handleTagChange = (cellId, newTag) => {
     const newTags = new Map(sensorTags);
     newTags.set(cellId, newTag);
     setSensorTags(newTags);
   };
-  
   const handleTagInputKeyDown = (e) => {
     if (e.key === 'Enter' || e.key === 'Escape') {
       setActiveTaggingCell(null);
     }
   };
-  
   const handleSaveTags = async () => {
     setIsSaving(true);
     setSuccess('');
     setError('');
-
     const payload = Array.from(sensorTags.entries())
       .filter(([, tag]) => tag.trim() !== "")
       .map(([blockId, sensorTag]) => {
@@ -223,19 +172,11 @@ function App() {
           }
           if (cellText) break;
         }
-
-        return {
-          blockId: blockId,
-          cellText: cellText.trim(),
-          sensorTag: sensorTag
-        };
+        return { blockId: blockId, cellText: cellText.trim(), sensorTag: sensorTag };
       });
-      
     console.log("--- Sending to Backend ---");
     console.log(JSON.stringify(payload, null, 2));
-    
     await new Promise(resolve => setTimeout(resolve, 1000));
-
     setIsSaving(false);
     setSuccess(`${payload.length} tags saved successfully!`);
   };
@@ -261,8 +202,10 @@ function App() {
       const isSel = selectedBlockId === rootBlock.Id;
       const style = { top: `${BoundingBox.Top*100}%`, left: `${BoundingBox.Left*100}%`, width: `${BoundingBox.Width*100}%`, height: `${BoundingBox.Height*100}%`};
       
-      // --- Add the new conditional class ---
-      const boxClasses = `bounding-box ${isSel ? 'selected' : ''} ${showCoverage ? 'coverage-visible' : ''}`;
+      // --- THIS IS THE LOGIC CHANGE ---
+      // Check if the root block has a non-empty tag.
+      const hasTag = sensorTags.has(rootBlock.Id) && sensorTags.get(rootBlock.Id).trim() !== '';
+      const boxClasses = `bounding-box ${isSel ? 'selected' : ''} ${showCoverage ? 'coverage-visible' : ''} ${hasTag ? 'tagged' : ''}`;
       
       return (
         <div id={`bbox-${rootBlock.Id}`} key={rootBlock.Id} className={boxClasses} style={style} onClick={() => handleBlockClick(originalCellId)} />
@@ -293,7 +236,6 @@ function App() {
                     const root = cellMergedMap.get(cell.id) || cell.id;
                     const isSel = selectedBlockId === root;
                     const isTaggable = !cell.isHeader && cell.text.trim() !== ' ';
-
                     return (
                       <td 
                         id={`cell-${cell.id}`} 
@@ -364,7 +306,6 @@ function App() {
       
       <main className="App-main">
         <section className="panel image-section">
-          {/* --- NEW HEADER STRUCTURE for the panel --- */}
           <div className="panel-header">
             <h2 className="section-title"><Eye size={20}/> Document Preview</h2>
             {imageUrl && (
