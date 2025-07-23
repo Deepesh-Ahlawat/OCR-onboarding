@@ -1,7 +1,7 @@
 // src/App.js
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, FileText, Eye, AlertCircle, CheckCircle, Loader, ZoomIn, ZoomOut, RotateCcw, Table } from 'lucide-react';
+import { Upload, FileText, Eye, AlertCircle, CheckCircle, Loader, ZoomIn, ZoomOut, RotateCcw, Table, Save, Tag } from 'lucide-react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import './App.css';
 
@@ -18,17 +18,18 @@ function App() {
   const [success, setSuccess] = useState('');
   const [selectedBlockId, setSelectedBlockId] = useState(null);
   const [visualize, setVisualize] = useState(false);
+  const [sensorTags, setSensorTags] = useState(new Map());
+  const [activeTaggingCell, setActiveTaggingCell] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const imageRef = useRef(null);
   const fileInputRef = useRef(null);
-  // --- NEW REF for zoom controls ---
   const transformComponentRef = useRef(null);
-
 
   // Cleanup URL
   useEffect(() => () => { if (imageUrl) URL.revokeObjectURL(imageUrl); }, [imageUrl]);
 
-  // --- PARSE & BUILD TABLES (No changes to this logic) ---
+  // --- PARSE & BUILD TABLES (No changes) ---
   const parseAndRenderTables = (jsonData) => {
     const Blocks = jsonData?.Blocks || [];
     if (!Blocks.length) { setTables([]); return; }
@@ -108,7 +109,7 @@ function App() {
         const r = cell.RowIndex - 1;
         const c = cell.ColumnIndex - 1;
         if(grid[r]) {
-          grid[r][c] = { id: cell.id, rowSpan: cell.rowSpan, colSpan: cell.colSpan, text: cell.text };
+          grid[r][c] = { id: cell.id, rowSpan: cell.rowSpan, colSpan: cell.colSpan, text: cell.text, isHeader: (cell.RowIndex === 1 || cell.ColumnIndex === 1) };
           for (let dr = 0; dr < cell.rowSpan; dr++) {
             for (let dc = 0; dc < cell.colSpan; dc++) {
               if (dr !== 0 || dc !== 0) {
@@ -126,13 +127,12 @@ function App() {
 
     setTables(parsed);
   }
-
-  // --- CLICK & HIGHLIGHT HANDLER ---
+  
+  // --- EVENT HANDLERS ---
   const handleBlockClick = (blockId) => {
     const root = cellMergedMap.get(blockId) || blockId;
     setSelectedBlockId(prev => prev === root ? null : root);
 
-    // --- SCROLL-TO-CELL LOGIC (from previous step) ---
     setTimeout(() => {
       const targetElement = document.getElementById(`cell-${root}`);
       if (targetElement) {
@@ -140,47 +140,116 @@ function App() {
       }
     }, 50);
 
-    // --- NEW ZOOM-TO-IMAGE LOGIC ---
     if (transformComponentRef.current) {
         const { zoomToElement } = transformComponentRef.current;
-        // The node ID for the bounding box div
         const boundingBoxId = `bbox-${root}`;
-        // Use the library's zoomToElement function for a smooth, centered zoom
         zoomToElement(boundingBoxId, 1.5, 200, 'easeOut');
     }
   };
 
-  // --- DRAW BOUNDING BOXES ---
-  const renderBoundingBoxes = () => {
-    if (!textractData?.Blocks || !imageRef.current) return null;
-    return textractData.Blocks
-      .filter(b => b.BlockType === 'CELL')
-      .map(cell => {
-        const root = cellMergedMap.get(cell.Id) || cell.Id;
-        const block = blocksMap.get(root) || cell;
-        const { BoundingBox } = block.Geometry;
-        const isSel = selectedBlockId === root;
-        const style = {
-          top: `${BoundingBox.Top * 100}%`,
-          left: `${BoundingBox.Left * 100}%`,
-          width: `${BoundingBox.Width * 100}%`,
-          height: `${BoundingBox.Height * 100}%`
+  const onFileChange = e => { const f = e.target.files[0]; if (!f) return; setImageFile(f); if (imageUrl) URL.revokeObjectURL(imageUrl); setImageUrl(URL.createObjectURL(f)); setTextractData(null); setTables([]); setError(''); setSuccess(''); setSelectedBlockId(null); setSensorTags(new Map())};
+  const onUpload = () => fileInputRef.current?.click();
+  const onAnalyze = async () => {
+    if (!imageFile) { setError('Select a document first.'); return; }
+    setLoading(true); setError(''); setSuccess(''); setTables([]); setSelectedBlockId(null); setSensorTags(new Map());
+    try {
+      const fd = new FormData(); fd.append('file', imageFile);
+      const resp = await fetch('http://127.0.0.1:5001/api/analyze',{method:'POST',body:fd});
+      const data = await resp.json(); if (!resp.ok) throw new Error(data.error || 'Analysis failed');
+      setTextractData(data); parseAndRenderTables(data); setSuccess('Analysis successful');
+    } catch (e) { setError(e.message); } finally { setLoading(false); }
+  };
+  
+  const handleTagChange = (cellId, newTag) => {
+    const newTags = new Map(sensorTags);
+    newTags.set(cellId, newTag);
+    setSensorTags(newTags);
+  };
+  
+  const handleTagInputKeyDown = (e) => {
+    if (e.key === 'Enter' || e.key === 'Escape') {
+      setActiveTaggingCell(null);
+    }
+  };
+  
+  const handleSaveTags = async () => {
+    setIsSaving(true);
+    setSuccess('');
+    setError('');
+
+    // --- THIS IS THE DEFINITIVE FIX ---
+    const payload = Array.from(sensorTags.entries())
+      .filter(([, tag]) => tag.trim() !== "")
+      .map(([blockId, sensorTag]) => {
+        
+        // Find the cell's text from the already-processed `tables` state
+        let cellText = '';
+        for (const table of tables) {
+          for (const row of table.grid) {
+            const foundCell = row.find(cell => cell && cell.id === blockId);
+            if (foundCell) {
+              cellText = foundCell.text;
+              break;
+            }
+          }
+          if (cellText) break;
+        }
+
+        return {
+          blockId: blockId,
+          cellText: cellText.trim(), // Use the text found in the state
+          sensorTag: sensorTag
         };
-        return (
-          // --- NEW ID ATTRIBUTE for the bounding box ---
-          <div id={`bbox-${root}`} key={root} className={`bounding-box ${isSel ? 'selected' : ''}`} style={style} onClick={() => handleBlockClick(cell.Id)} />
-        );
       });
+      
+    console.log("--- Sending to Backend ---");
+    console.log(JSON.stringify(payload, null, 2));
+    
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    setIsSaving(false);
+    setSuccess(`${payload.length} tags saved successfully!`);
   };
 
-  // --- RENDER TABLES ---
+  // --- RENDER LOGIC ---
+  const renderBoundingBoxes = () => {
+    if (!textractData?.Blocks || !imageRef.current) return null;
+    const uniqueRootBlocks = new Map();
+    textractData.Blocks
+      .filter(b => b.BlockType === 'CELL')
+      .forEach(cell => {
+        const rootId = cellMergedMap.get(cell.Id) || cell.Id;
+        if (!uniqueRootBlocks.has(rootId)) {
+          uniqueRootBlocks.set(rootId, {
+            originalCellId: cell.Id, 
+            rootBlock: blocksMap.get(rootId) || cell
+          });
+        }
+      });
+    
+    return Array.from(uniqueRootBlocks.values()).map(({ originalCellId, rootBlock }) => {
+      const { BoundingBox } = rootBlock.Geometry;
+      const isSel = selectedBlockId === rootBlock.Id;
+      const style = { top: `${BoundingBox.Top*100}%`, left: `${BoundingBox.Left*100}%`, width: `${BoundingBox.Width*100}%`, height: `${BoundingBox.Height*100}%`};
+      
+      return (
+        <div id={`bbox-${rootBlock.Id}`} key={rootBlock.Id} className={`bounding-box ${isSel ? 'selected' : ''} `} style={style} onClick={() => handleBlockClick(originalCellId)} />
+      );
+    });
+  };
+  
   const renderAllTables = () => {
     if (!tables.length) return null;
     return (
       <div className="data-section">
         <div className="table-header-controls">
           <h3 className="section-title"><Table size={20} /> Extracted Tables ({tables.length})</h3>
-          <label><input type="checkbox" checked={visualize} onChange={e => setVisualize(e.target.checked)} /> Color-coded View</label>
+          <div className="controls-right">
+            <label className="toggle-control"><input type="checkbox" checked={visualize} onChange={e => setVisualize(e.target.checked)} /> Color-coded</label>
+            <button className="btn btn-save" onClick={handleSaveTags} disabled={isSaving || sensorTags.size === 0}>
+              {isSaving ? <><Loader className="animate-spin" size={18}/> Saving...</> : <><Save size={18}/> Save All Tags</>}
+            </button>
+          </div>
         </div>
         {tables.map(table => (
           <div key={table.id} className="table-container">
@@ -191,16 +260,44 @@ function App() {
                     if (!cell || cell.spanned) return null;
                     const root = cellMergedMap.get(cell.id) || cell.id;
                     const isSel = selectedBlockId === root;
+                    const isTaggable = !cell.isHeader && cell.text.trim() !== ' ';
+
                     return (
                       <td 
                         id={`cell-${cell.id}`} 
                         key={cell.id} 
                         rowSpan={cell.rowSpan} 
                         colSpan={cell.colSpan} 
-                        className={['cell', isSel ? 'selected-row' : '', visualize ? 'highlight-cell' : ''].join(' ')} 
-                        onClick={() => handleBlockClick(cell.id)}
+                        className={['cell', isSel ? 'selected-row' : '', isTaggable ? 'taggable-cell' : ''].join(' ')} 
+                        onClick={() => {
+                            handleBlockClick(cell.id);
+                            if(isTaggable) setActiveTaggingCell(cell.id);
+                        }}
                       >
-                        <div className="cell-content">{cell.text}</div>
+                        {activeTaggingCell === cell.id ? (
+                            <div className="cell-content-editing">
+                                <Tag size={16} className="tag-icon"/>
+                                <input
+                                    type="text"
+                                    className="tag-input"
+                                    placeholder="Enter sensor tag..."
+                                    value={sensorTags.get(cell.id) || ''}
+                                    onChange={(e) => handleTagChange(cell.id, e.target.value)}
+                                    onKeyDown={handleTagInputKeyDown}
+                                    onBlur={() => setActiveTaggingCell(null)}
+                                    autoFocus
+                                />
+                            </div>
+                        ) : (
+                            <div className="cell-content">
+                                <span className="cell-text">{cell.text}</span>
+                                {sensorTags.has(cell.id) && sensorTags.get(cell.id) &&
+                                    <span className="sensor-tag-badge">
+                                        <Tag size={12} /> {sensorTags.get(cell.id)}
+                                    </span>
+                                }
+                            </div>
+                        )}
                       </td>
                     );
                   })}
@@ -213,41 +310,31 @@ function App() {
     );
   };
 
-  // --- FILE & ANALYSIS ---
-  const onFileChange = e => { const f = e.target.files[0]; if (!f) return; setImageFile(f); if (imageUrl) URL.revokeObjectURL(imageUrl); setImageUrl(URL.createObjectURL(f)); setTextractData(null); setTables([]); setError(''); setSuccess(''); setSelectedBlockId(null); };
-  const onUpload = () => fileInputRef.current?.click();
-  const onAnalyze = async () => {
-    if (!imageFile) { setError('Select a document first.'); return; }
-    setLoading(true); setError(''); setSuccess(''); setTables([]); setSelectedBlockId(null);
-    try {
-      const fd = new FormData(); fd.append('file', imageFile);
-      const resp = await fetch('http://127.0.0.1:5001/api/analyze',{method:'POST',body:fd});
-      const data = await resp.json(); if (!resp.ok) throw new Error(data.error || 'Analysis failed');
-      setTextractData(data); parseAndRenderTables(data); setSuccess('Analysis successful');
-    } catch (e) { setError(e.message); } finally { setLoading(false); }
-  };
-
   // --- MAIN JSX ---
   return (
     <div className="App">
       <header className="App-header">
-        <h1>Document Intelligence Platform</h1>
-        <div className="controls">
-          <input ref={fileInputRef} type="file" accept="image/*,application/pdf" onChange={onFileChange} style={{ display:'none' }}/>
-          <button className="btn btn-upload" onClick={onUpload}><Upload size={18}/> {imageFile?'Change Document':'Upload Document'}</button>
-          <button className={`btn btn-analyze ${(!imageFile||loading)?'disabled':''}`} onClick={onAnalyze} disabled={!imageFile||loading}>
-            {loading?<><Loader className="animate-spin" size={18}/> Analyzing...</>:<><FileText size={18}/> Analyze</>}
-          </button>
+        <div className="header-main">
+            <h1>Document Intelligence Platform</h1>
+            <div className="controls">
+                <input ref={fileInputRef} type="file" accept="image/*,application/pdf" onChange={onFileChange} style={{ display:'none' }}/>
+                <button className="btn btn-upload" onClick={onUpload}><Upload size={18}/> {imageFile?'Change Document':'Upload Document'}</button>
+                <button className={`btn btn-analyze ${(!imageFile||loading)?'disabled':''}`} onClick={onAnalyze} disabled={!imageFile||loading}>
+                    {loading?<><Loader className="animate-spin" size={18}/> Analyzing...</>:<><FileText size={18}/> Analyze</>}
+                </button>
+            </div>
         </div>
-        {error&&<div className="alert error-state"><AlertCircle size={20}/> {error}</div>}
-        {success&&<div className="alert success-state"><CheckCircle size={20}/> {success}</div>}
+        <div className="header-alerts">
+            {error && <div className="alert error-state"><AlertCircle size={20}/> {error}</div>}
+            {success && <div className="alert success-state"><CheckCircle size={20}/> {success}</div>}
+        </div>
       </header>
+      
       <main className="App-main">
         <section className="panel image-section">
           <h2 className="section-title"><Eye size={20}/> Document Preview</h2>
           <div className="image-preview-wrapper">
             {imageUrl?
-              // --- Pass the ref to TransformWrapper ---
               <TransformWrapper ref={transformComponentRef} options={{limitToBounds:false}} pan={{velocity:true}} wheel={{step:0.2}} doubleClick={{disabled:true}} zoomAnimation={{animationTime:200}}>
                 {({zoomIn,zoomOut,resetTransform})=><>
                   <div className="zoom-controls"><button onClick={()=>zoomIn(0.2)}><ZoomIn size={18}/></button><button onClick={()=>zoomOut(0.2)}><ZoomOut size={18}/></button><button onClick={()=>resetTransform()}><RotateCcw size={18}/></button></div>
