@@ -5,15 +5,13 @@ import { Upload, FileText, Eye, AlertCircle, CheckCircle, Loader, ZoomIn, ZoomOu
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import './App.css';
 
-// --- HELPER FUNCTION: Defined once at a higher scope to be reusable ---
+// --- HELPER FUNCTION (No Change) ---
 const getText = (block, fullMap) => {
     if (!block) return '';
     const childRel = block.Relationships?.find(r => r.Type === 'CHILD');
     if (!childRel) return '';
-
     const childBlocks = childRel.Ids.map(id => fullMap.get(id)).filter(Boolean);
     const lineBlocks = childBlocks.filter(b => b.BlockType === 'LINE');
-
     if (!lineBlocks.length) {
         const wordBlocks = childBlocks.filter(b => b.BlockType === 'WORD');
         if (wordBlocks.length > 0) {
@@ -22,11 +20,9 @@ const getText = (block, fullMap) => {
         }
         return '';
     }
-
     lineBlocks.sort((a, b) => a.Geometry.BoundingBox.Top - b.Geometry.BoundingBox.Top);
     return lineBlocks.map(line => line.Text).join(' ');
 };
-
 
 function App() {
   // --- STATE AND REFS ---
@@ -44,6 +40,10 @@ function App() {
   const [sensorTags, setSensorTags] = useState(new Map());
   const [activeTaggingCell, setActiveTaggingCell] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // --- NEW STATE for Coverage View ---
+  const [showCoverage, setShowCoverage] = useState(false);
+
 
   const imageRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -52,7 +52,7 @@ function App() {
   // Cleanup URL
   useEffect(() => () => { if (imageUrl) URL.revokeObjectURL(imageUrl); }, [imageUrl]);
 
-  // --- PARSE & BUILD TABLES ---
+  // --- PARSE & BUILD TABLES (No changes) ---
   const parseAndRenderTables = (jsonData) => {
     const Blocks = jsonData?.Blocks || [];
     if (!Blocks.length) { setTables([]); return; }
@@ -157,16 +157,38 @@ function App() {
     }
   };
 
-  const onFileChange = e => { const f = e.target.files[0]; if (!f) return; setImageFile(f); if (imageUrl) URL.revokeObjectURL(imageUrl); setImageUrl(URL.createObjectURL(f)); setTextractData(null); setTables([]); setError(''); setSuccess(''); setSelectedBlockId(null); setSensorTags(new Map())};
+  const resetState = () => {
+    setTextractData(null); 
+    setTables([]); 
+    setError(''); 
+    setSuccess(''); 
+    setSelectedBlockId(null); 
+    setSensorTags(new Map());
+    setShowCoverage(false);
+  }
+
+  const onFileChange = e => { 
+    const f = e.target.files[0]; 
+    if (!f) return; 
+    setImageFile(f); 
+    if (imageUrl) URL.revokeObjectURL(imageUrl); 
+    setImageUrl(URL.createObjectURL(f)); 
+    resetState();
+  };
+  
   const onUpload = () => fileInputRef.current?.click();
+  
   const onAnalyze = async () => {
     if (!imageFile) { setError('Select a document first.'); return; }
-    setLoading(true); setError(''); setSuccess(''); setTables([]); setSelectedBlockId(null); setSensorTags(new Map());
+    setLoading(true);
+    resetState();
     try {
       const fd = new FormData(); fd.append('file', imageFile);
       const resp = await fetch('http://127.0.0.1:5001/api/analyze',{method:'POST',body:fd});
       const data = await resp.json(); if (!resp.ok) throw new Error(data.error || 'Analysis failed');
-      setTextractData(data); parseAndRenderTables(data); setSuccess('Analysis successful');
+      setTextractData(data); 
+      parseAndRenderTables(data); 
+      setSuccess('Analysis successful');
     } catch (e) { setError(e.message); } finally { setLoading(false); }
   };
   
@@ -190,7 +212,6 @@ function App() {
     const payload = Array.from(sensorTags.entries())
       .filter(([, tag]) => tag.trim() !== "")
       .map(([blockId, sensorTag]) => {
-        
         let cellText = '';
         for (const table of tables) {
           for (const row of table.grid) {
@@ -224,7 +245,7 @@ function App() {
     if (!textractData?.Blocks || !imageRef.current) return null;
     const uniqueRootBlocks = new Map();
     textractData.Blocks
-      .filter(b => b.BlockType === 'CELL')
+      .filter(b => b.BlockType === 'CELL' || b.BlockType === 'MERGED_CELL')
       .forEach(cell => {
         const rootId = cellMergedMap.get(cell.Id) || cell.Id;
         if (!uniqueRootBlocks.has(rootId)) {
@@ -238,12 +259,13 @@ function App() {
     return Array.from(uniqueRootBlocks.values()).map(({ originalCellId, rootBlock }) => {
       const { BoundingBox } = rootBlock.Geometry;
       const isSel = selectedBlockId === rootBlock.Id;
-      // --- THIS IS THE FIX ---
-      // Changed Bounding.Height to BoundingBox.Height
       const style = { top: `${BoundingBox.Top*100}%`, left: `${BoundingBox.Left*100}%`, width: `${BoundingBox.Width*100}%`, height: `${BoundingBox.Height*100}%`};
       
+      // --- Add the new conditional class ---
+      const boxClasses = `bounding-box ${isSel ? 'selected' : ''} ${showCoverage ? 'coverage-visible' : ''}`;
+      
       return (
-        <div id={`bbox-${rootBlock.Id}`} key={rootBlock.Id} className={`bounding-box ${isSel ? 'selected' : ''}`} style={style} onClick={() => handleBlockClick(originalCellId)} />
+        <div id={`bbox-${rootBlock.Id}`} key={rootBlock.Id} className={boxClasses} style={style} onClick={() => handleBlockClick(originalCellId)} />
       );
     });
   };
@@ -342,7 +364,22 @@ function App() {
       
       <main className="App-main">
         <section className="panel image-section">
-          <h2 className="section-title"><Eye size={20}/> Document Preview</h2>
+          {/* --- NEW HEADER STRUCTURE for the panel --- */}
+          <div className="panel-header">
+            <h2 className="section-title"><Eye size={20}/> Document Preview</h2>
+            {imageUrl && (
+              <div className="view-controls">
+                <label className="toggle-control">
+                  <input 
+                    type="checkbox" 
+                    checked={showCoverage} 
+                    onChange={e => setShowCoverage(e.target.checked)} 
+                  /> 
+                  Show Coverage
+                </label>
+              </div>
+            )}
+          </div>
           <div className="image-preview-wrapper">
             {imageUrl?
               <TransformWrapper ref={transformComponentRef} options={{limitToBounds:false}} pan={{velocity:true}} wheel={{step:0.2}} doubleClick={{disabled:true}} zoomAnimation={{animationTime:200}}>
