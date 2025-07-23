@@ -1,8 +1,7 @@
 // src/App.js
 
 import React, { useState, useRef, useEffect } from 'react';
-// --- Import the new X icon ---
-import { Upload, FileText, Eye, AlertCircle, CheckCircle, Loader, ZoomIn, ZoomOut, RotateCcw, Table, Save, Tag, X } from 'lucide-react';
+import { Upload, FileText, Eye, AlertCircle, CheckCircle, Loader, ZoomIn, ZoomOut, RotateCcw, Table, Save, Tag, X, PlusCircle } from 'lucide-react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import './App.css';
 
@@ -25,6 +24,61 @@ const getText = (block, fullMap) => {
     return lineBlocks.map(line => line.Text).join(' ');
 };
 
+
+// --- MODAL COMPONENT ---
+function AddCellModal({ onSave, onCancel }) {
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const newCell = {
+            id: `custom-${Date.now()}`,
+            label: formData.get('label'),
+            valueType: formData.get('valueType'),
+            sensorTag: formData.get('sensorTag')
+        };
+        onSave(newCell);
+    };
+    
+    return (
+        <div className="modal-backdrop" onClick={onCancel}>
+            <div className="modal-content" onClick={e => e.stopPropagation()}>
+                <h3>Add Custom Field</h3>
+                <form onSubmit={handleSubmit}>
+                    <div className="form-group">
+                        <label htmlFor="label">Label / Context</label>
+                        <input id="label" name="label" type="text" placeholder="e.g., Sludge Meter, PH" required />
+                    </div>
+                    
+                    <div className="form-group">
+                        <label>Datatype</label>
+                        <div className="radio-group">
+                            {/* --- THIS IS THE JSX CHANGE --- */}
+                            <label>
+                                <input type="radio" name="valueType" value="string" defaultChecked />
+                                <span className="radio-label-text">Text (string)</span>
+                            </label>
+                            <label>
+                                <input type="radio" name="valueType" value="int" />
+                                <span className="radio-label-text">Number (int)</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div className="form-group">
+                        <label htmlFor="sensorTag">Sensor Tag</label>
+                        <input id="sensorTag" name="sensorTag" type="text" placeholder="e.g., stp_sludge_meter_reading" required />
+                    </div>
+                    <div className="form-actions">
+                        <button type="button" className="btn btn-cancel" onClick={onCancel}>Cancel</button>
+                        <button type="submit" className="btn btn-save">Save Field</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
+
 function App() {
   // --- STATE AND REFS (No changes) ---
   const [imageFile, setImageFile] = useState(null);
@@ -42,6 +96,8 @@ function App() {
   const [activeTaggingCell, setActiveTaggingCell] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [showCoverage, setShowCoverage] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [customCells, setCustomCells] = useState([]);
 
   const imageRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -130,7 +186,7 @@ function App() {
     }
   };
 
-  const resetState = () => { setTextractData(null); setTables([]); setError(''); setSuccess(''); setSelectedBlockId(null); setSensorTags(new Map()); setShowCoverage(false); }
+  const resetState = () => { setTextractData(null); setTables([]); setError(''); setSuccess(''); setSelectedBlockId(null); setSensorTags(new Map()); setShowCoverage(false); setCustomCells([]); }
   const onFileChange = e => { const f = e.target.files[0]; if (!f) return; setImageFile(f); if (imageUrl) URL.revokeObjectURL(imageUrl); setImageUrl(URL.createObjectURL(f)); resetState(); };
   const onUpload = () => fileInputRef.current?.click();
   const onAnalyze = async () => {
@@ -159,7 +215,6 @@ function App() {
     }
   };
 
-  // --- NEW Delete Tag Handler ---
   const handleDeleteTag = (cellId) => {
     const newTags = new Map(sensorTags);
     newTags.delete(cellId);
@@ -170,7 +225,8 @@ function App() {
     setIsSaving(true);
     setSuccess('');
     setError('');
-    const payload = Array.from(sensorTags.entries())
+    
+    const taggedPayload = Array.from(sensorTags.entries())
       .filter(([, tag]) => tag.trim() !== "")
       .map(([blockId, sensorTag]) => {
         let cellText = '';
@@ -184,14 +240,36 @@ function App() {
           }
           if (cellText) break;
         }
-        return { blockId: blockId, cellText: cellText.trim(), sensorTag: sensorTag };
+        return { blockId: blockId, cellText: cellText.trim(), sensorTag: sensorTag, isCustom: false };
       });
+      
+    const customPayload = customCells.map(cell => ({
+        blockId: cell.id,
+        label: cell.label,
+        valueType: cell.valueType,
+        sensorTag: cell.sensorTag,
+        isCustom: true
+    }));
+
+    const finalPayload = [...taggedPayload, ...customPayload];
+      
     console.log("--- Sending to Backend ---");
-    console.log(JSON.stringify(payload, null, 2));
+    console.log(JSON.stringify(finalPayload, null, 2));
+    
     await new Promise(resolve => setTimeout(resolve, 1000));
     setIsSaving(false);
-    setSuccess(`${payload.length} tags saved successfully!`);
+    setSuccess(`${finalPayload.length} total entries saved successfully!`);
   };
+
+  const handleAddCustomCell = (newCell) => {
+    setCustomCells(prev => [...prev, newCell]);
+    setIsAddModalOpen(false);
+  };
+
+  const handleDeleteCustomCell = (idToDelete) => {
+    setCustomCells(prev => prev.filter(cell => cell.id !== idToDelete));
+  };
+
 
   // --- RENDER LOGIC ---
   const renderBoundingBoxes = () => {
@@ -222,83 +300,104 @@ function App() {
   };
   
   const renderAllTables = () => {
-    if (!tables.length) return null;
+    if (!tables.length && !customCells.length) return null;
     return (
       <div className="data-section">
-        <div className="table-header-controls">
-          <h3 className="section-title"><Table size={20} /> Extracted Tables ({tables.length})</h3>
-          <div className="controls-right">
-            <label className="toggle-control"><input type="checkbox" checked={visualize} onChange={e => setVisualize(e.target.checked)} /> Color-coded</label>
-            <button className="btn btn-save" onClick={handleSaveTags} disabled={isSaving || sensorTags.size === 0}>
-              {isSaving ? <><Loader className="animate-spin" size={18}/> Saving...</> : <><Save size={18}/> Save All Tags</>}
-            </button>
-          </div>
-        </div>
-        {tables.map(table => (
-          <div key={table.id} className="table-container">
-            <table className="results-table"><tbody>
-              {table.grid.map((row, ri) => (
-                <tr key={ri}>
-                  {row.map((cell) => {
-                    if (!cell || cell.spanned) return null;
-                    const root = cellMergedMap.get(cell.id) || cell.id;
-                    const isSel = selectedBlockId === root;
-                    const isTaggable = !cell.isHeader && cell.text.trim() !== ' ';
-                    return (
-                      <td 
-                        id={`cell-${cell.id}`} 
-                        key={cell.id} 
-                        rowSpan={cell.rowSpan} 
-                        colSpan={cell.colSpan} 
-                        className={['cell', isSel ? 'selected-row' : '', isTaggable ? 'taggable-cell' : ''].join(' ')} 
-                        onClick={() => {
-                            handleBlockClick(cell.id);
-                            if(isTaggable) setActiveTaggingCell(cell.id);
-                        }}
-                      >
-                        {activeTaggingCell === cell.id ? (
-                            <div className="cell-content-editing">
-                                <Tag size={16} className="tag-icon"/>
-                                <input
-                                    type="text"
-                                    className="tag-input"
-                                    placeholder="Enter sensor tag..."
-                                    value={sensorTags.get(cell.id) || ''}
-                                    onChange={(e) => handleTagChange(cell.id, e.target.value)}
-                                    onKeyDown={handleTagInputKeyDown}
-                                    onBlur={() => setActiveTaggingCell(null)}
-                                    autoFocus
-                                />
-                            </div>
-                        ) : (
-                            <div className="cell-content">
-                                <span className="cell-text">{cell.text}</span>
-                                {sensorTags.has(cell.id) && sensorTags.get(cell.id) &&
-                                    <span className="sensor-tag-badge">
-                                        <Tag size={12} /> 
-                                        {sensorTags.get(cell.id)}
-                                        {/* --- NEW Delete Button --- */}
-                                        <button 
-                                          className="delete-tag-btn"
-                                          onClick={(e) => {
-                                            e.stopPropagation(); // Prevent cell click
-                                            handleDeleteTag(cell.id);
-                                          }}
-                                        >
-                                          <X size={12}/>
-                                        </button>
-                                    </span>
-                                }
-                            </div>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody></table>
-          </div>
-        ))}
+        {tables.length > 0 &&
+        <>
+            <div className="table-header-controls">
+                <h3 className="section-title"><Table size={20} /> Extracted Tables ({tables.length})</h3>
+            </div>
+            {tables.map(table => (
+            <div key={table.id} className="table-container">
+                <table className="results-table"><tbody>
+                {table.grid.map((row, ri) => (
+                    <tr key={ri}>
+                    {row.map((cell) => {
+                        if (!cell || cell.spanned) return null;
+                        const root = cellMergedMap.get(cell.id) || cell.id;
+                        const isSel = selectedBlockId === root;
+                        const isTaggable = !cell.isHeader && cell.text.trim() !== ' ';
+                        return (
+                        <td 
+                            id={`cell-${cell.id}`} 
+                            key={cell.id} 
+                            rowSpan={cell.rowSpan} 
+                            colSpan={cell.colSpan} 
+                            className={['cell', isSel ? 'selected-row' : '', isTaggable ? 'taggable-cell' : ''].join(' ')} 
+                            onClick={() => {
+                                handleBlockClick(cell.id);
+                                if(isTaggable) setActiveTaggingCell(cell.id);
+                            }}
+                        >
+                            {activeTaggingCell === cell.id ? (
+                                <div className="cell-content-editing">
+                                    <Tag size={16} className="tag-icon"/>
+                                    <input
+                                        type="text"
+                                        className="tag-input"
+                                        placeholder="Enter sensor tag..."
+                                        value={sensorTags.get(cell.id) || ''}
+                                        onChange={(e) => handleTagChange(cell.id, e.target.value)}
+                                        onKeyDown={handleTagInputKeyDown}
+                                        onBlur={() => setActiveTaggingCell(null)}
+                                        autoFocus
+                                    />
+                                </div>
+                            ) : (
+                                <div className="cell-content">
+                                    <span className="cell-text">{cell.text}</span>
+                                    {sensorTags.has(cell.id) && sensorTags.get(cell.id) &&
+                                        <span className="sensor-tag-badge">
+                                            <Tag size={12} /> 
+                                            {sensorTags.get(cell.id)}
+                                            <button className="delete-tag-btn" onClick={(e) => { e.stopPropagation(); handleDeleteTag(cell.id); }}>
+                                            <X size={12}/>
+                                            </button>
+                                        </span>
+                                    }
+                                </div>
+                            )}
+                        </td>
+                        );
+                    })}
+                    </tr>
+                ))}
+                </tbody></table>
+            </div>
+            ))}
+        </>
+        }
+        
+        {customCells.length > 0 && (
+            <div className="custom-cells-section">
+                <h4 className="custom-cells-title">Manually Added Fields</h4>
+                <table className="results-table custom-table">
+                    <thead>
+                        <tr>
+                            <th>Label / Context</th>
+                            <th>Datatype</th>
+                            <th>Sensor Tag</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {customCells.map(cell => (
+                            <tr key={cell.id}>
+                                <td>{cell.label}</td>
+                                <td><span className="datatype-badge">{cell.valueType}</span></td>
+                                <td>{cell.sensorTag}</td>
+                                <td>
+                                    <button className="delete-custom-btn" onClick={() => handleDeleteCustomCell(cell.id)}>
+                                        <X size={14} />
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        )}
       </div>
     );
   };
@@ -306,6 +405,8 @@ function App() {
   // --- MAIN JSX ---
   return (
     <div className="App">
+      {isAddModalOpen && <AddCellModal onSave={handleAddCustomCell} onCancel={() => setIsAddModalOpen(false)} />}
+
       <header className="App-header">
         <div className="header-main">
             <h1>Document Intelligence Platform</h1>
@@ -330,12 +431,7 @@ function App() {
             {imageUrl && (
               <div className="view-controls">
                 <label className="toggle-control">
-                  <input 
-                    type="checkbox" 
-                    checked={showCoverage} 
-                    onChange={e => setShowCoverage(e.target.checked)} 
-                  /> 
-                  Show Coverage
+                  <input type="checkbox" checked={showCoverage} onChange={e => setShowCoverage(e.target.checked)} /> Show Coverage
                 </label>
               </div>
             )}
@@ -352,7 +448,19 @@ function App() {
           </div>
         </section>
         <section className="panel results-section">
-          <h2 className="section-title"><Table size={20}/> Extracted Data</h2>
+          <div className="panel-header">
+            <h2 className="section-title"><Table size={20}/> Extracted Data</h2>
+            {textractData && (
+                <div className="view-controls">
+                    <button className="btn btn-add" onClick={() => setIsAddModalOpen(true)}>
+                        <PlusCircle size={16}/> Add Field
+                    </button>
+                    <button className="btn btn-save" onClick={handleSaveTags} disabled={isSaving || (sensorTags.size === 0 && customCells.length === 0)}>
+                        {isSaving ? <><Loader className="animate-spin" size={16}/> Saving...</> : <><Save size={16}/> Save All</>}
+                    </button>
+                </div>
+            )}
+          </div>
           <div className="results-content">
             {loading?<div className="loading-overlay"><Loader size={40} className="animate-spin"/></div>
             : textractData? renderAllTables() : <div className="empty-state"><Eye size={40}/><p>Extracted tables will appear here.</p></div>}

@@ -1,25 +1,14 @@
 /* Enhanced Production-Grade Styles for Document Intelligence Platform */
 
 /* Reset and base styles */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  line-height: 1.6;
-  color: #1e293b;
-  background: #f8fafc;
-}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #1e293b; background: #f8fafc; }
 
 /* Custom scrollbar */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: #f1f5f9; }
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; border: 2px solid #f1f5f9; }
 ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-
 
 /* --- App Layout --- */
 .App { display: flex; flex-direction: column; height: 100vh; }
@@ -30,191 +19,146 @@ body {
 .header-alerts { min-height: 38px; }
 .alert { padding: 0.5rem 1rem; border-radius: 8px; display: flex; align-items: center; gap: 0.5rem; max-width: 400px; }
 
-
 /* --- Main Layout --- */
 .App-main { flex-grow: 1; max-width: 1600px; width: 100%; margin: 0 auto; padding: 2rem; display: grid; grid-template-columns: 1.2fr 1fr; gap: 2rem; align-items: flex-start; overflow: hidden; }
 .panel { background: white; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); height: calc(100vh - 180px); display: flex; flex-direction: column; }
-
-
-/* --- Panel Header for View Controls --- */
 .panel-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; flex-shrink: 0; }
 .panel-header .section-title { border-bottom: none; }
-.view-controls { padding-right: 1rem; font-size: 0.875rem; }
+.view-controls { padding-right: 1rem; font-size: 0.875rem; display: flex; align-items: center; gap: 1rem; }
 .view-controls .toggle-control { display: flex; align-items: center; gap: 0.5rem; color: #475569; cursor: pointer; }
 .view-controls input { cursor: pointer; }
-
-
 .section-title { font-size: 1.125rem; font-weight: 600; padding: 1rem; display: flex; align-items: center; gap: 0.5rem; color: #334155; flex-shrink: 0; }
-
 
 /* --- Image Preview Section --- */
 .image-preview-wrapper { position: relative; flex-grow: 1; overflow: hidden; border-radius: 0 0 12px 12px; }
 .transform-wrapper { width: 100%; height: 100%; }
 .preview-image { width: 100%; }
-
-
-/* --- Bounding Box Styling --- */
 .bounding-box { position: absolute; border: 1.5px solid rgba(239, 68, 68, 0.7); cursor: pointer; transition: all 0.2s ease; border-radius: 2px; }
 .bounding-box:hover { background-color: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 1); }
-.bounding-box.selected { background-color: rgba(16, 185, 129, 0.2) !important; border-color: #10b981 !important; }
-
-/* --- Coverage View Styling --- */
-.bounding-box.coverage-visible {
-    /* FIX #2: Changed opacity from 0.25 to 0.4 for a more vibrant red */
-    background-color: rgba(239, 68, 68, 0.7); 
-}
-.bounding-box.coverage-visible:hover {
-    background-color: rgba(239, 68, 68, 0.5); 
-}
-.bounding-box.selected.coverage-visible {
-    background-color: rgba(16, 185, 129, 0.5) !important; 
-}
-
-.bounding-box { position: absolute; border: 1.5px solid rgba(239, 68, 68, 0.7); cursor: pointer; transition: all 0.2s ease; border-radius: 2px; }
-.bounding-box:hover { background-color: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 1); }
-
-
-/* --- NEW: Tagged Bounding Box Styling --- */
-.bounding-box.tagged {
-  /* This is the light blue confirmation color */
-  border-color: rgb(0 97 255);
-  border-width: 2.5px;
-}
-.bounding-box.tagged:hover {
-  background-color: rgba(59, 130, 246, 0.15);
-  border-color: rgba(59, 130, 246, 1);
-}
-.bounding-box.tagged.coverage-visible {
-  background-color: rgba(59, 130, 246, 0.3);
-}
-.bounding-box.tagged.coverage-visible:hover {
-  background-color: rgba(59, 130, 246, 0.4);
-}
-
-
-/* --- Selected Styling (ensure it overrides everything) --- */
-.bounding-box.selected { 
-  background-color: rgba(16, 185, 129, 0.3) !important; 
-  border-color: #10b981 !important; 
-}
-.bounding-box.selected.coverage-visible {
-  background-color: rgba(16, 185, 129, 0.5) !important;
-}
-
-
-/* --- Coverage View Styling --- */
-.bounding-box.coverage-visible {
-    background-color: rgba(239, 68, 68, 0.7); 
-}
-.bounding-box.coverage-visible:hover {
-    background-color: rgba(239, 68, 68, 0.8); 
-}
-
-/* --- Add these rules to the end of App.css --- */
-
-.sensor-tag-badge {
-    /* Make the badge a flex container to align the new button */
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    background-color: #e0e7ff;
-    color: #4338ca;
-    padding: 2px 2px 2px 6px; /* Adjust padding for the button */
-    border-radius: 999px;
-    font-size: 0.75rem;
-    font-weight: 500;
-    max-width: fit-content;
-}
-
-.delete-tag-btn {
-    background-color: transparent;
-    border: none;
-    padding: 0;
-    margin: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    border-radius: 50%;
-    width: 16px;
-    height: 16px;
-    color: #4338ca; /* Same color as badge text */
-    transition: background-color 0.2s ease, color 0.2s ease;
-}
-
-.delete-tag-btn:hover {
-    background-color: #c7d2fe;
-    color: #3730a3;
-}
-
-
+.bounding-box.tagged { border-color: rgb(0 97 255); border-width: 2.5px; }
+.bounding-box.tagged:hover { background-color: rgba(59, 130, 246, 0.15); border-color: rgba(59, 130, 246, 1); }
+.bounding-box.tagged.coverage-visible { background-color: rgba(59, 130, 246, 0.3); }
+.bounding-box.selected { background-color: rgba(16, 185, 129, 0.3) !important; border-color: #10b981 !important; }
+.bounding-box.coverage-visible { background-color: rgba(239, 68, 68, 0.7); }
 .zoom-controls { position: absolute; top: 10px; right: 10px; z-index: 20; display: flex; gap: 8px; background-color: rgba(255, 255, 255, 0.8); padding: 8px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
-.zoom-controls button { 
-    display: flex; 
-    align-items: center; 
-    justify-content: center; 
-    width: 32px; 
-    height: 32px; 
-    border: none; 
-    background-color: #fff; 
-    /* FIX #1: Corrected the invalid hex code for the icon color */
-    color: #374151; 
-    border-radius: 8px; 
-    cursor: pointer; 
-}
-
+.zoom-controls button { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: none; background-color: #fff; color: #374151; border-radius: 8px; cursor: pointer; }
 
 /* --- Results Section --- */
 .results-section .results-content { flex-grow: 1; overflow-y: auto; position: relative; }
 .data-section { display: flex; flex-direction: column; height: 100%; padding: 1rem;}
 .table-container { border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 1.5rem; overflow-x: auto; flex-shrink: 0; }
 .results-table { width: 100%; border-collapse: collapse; }
-
-
-/* --- Cell Styling --- */
 .results-table td.cell { padding: 2px; border: 1px solid #e2e8f0; vertical-align: middle; text-align: left; white-space: nowrap; scroll-margin: 20px; }
 .cell-content { display: flex; flex-direction: column; gap: 4px; padding: 6px; min-height: 40px; }
 .cell-text { font-size: 0.9rem; }
 .selected-row { background-color: #d1fae5 !important; }
-
-
-/* --- Taggable Cell Styling --- */
 .taggable-cell { cursor: pointer; }
 .taggable-cell:hover { background-color: #f7f9fc; }
 .cell-content-editing { display: flex; align-items: center; gap: 6px; padding: 4px; }
 .tag-icon { color: #64748b; flex-shrink: 0; }
 .tag-input { width: 100%; border: none; background: transparent; outline: none; font-size: 0.9rem; padding: 4px 0; }
-.sensor-tag-badge { display: inline-flex; align-items: center; gap: 4px; background-color: #e0e7ff; color: #4338ca; padding: 2px 6px; border-radius: 999px; font-size: 0.75rem; font-weight: 500; max-width: fit-content; }
-
-
-/* --- Cell Visualization & Merged Cell Styles --- */
+.sensor-tag-badge { display: inline-flex; align-items: center; gap: 4px; background-color: #e0e7ff; color: #4338ca; padding: 2px 2px 2px 6px; border-radius: 999px; font-size: 0.75rem; font-weight: 500; max-width: fit-content; }
+.delete-tag-btn { background-color: transparent; border: none; padding: 0; margin: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 50%; width: 16px; height: 16px; color: #4338ca; transition: background-color 0.2s ease, color 0.2s ease; }
+.delete-tag-btn:hover { background-color: #c7d2fe; color: #3730a3; }
 .cell-header-default .cell-content { font-weight: 600; }
 .merged-cell .cell-content { display: block; background-color: #dbeafe; border-color: #bfdbfe; color: #1e40af; font-weight: 600; text-align: center; padding: 8px; }
-
-
-/* --- Header Controls --- */
 .table-header-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-shrink: 0; }
-.controls-right { display: flex; align-items: center; gap: 1.5rem; }
-.toggle-control { display: flex; align-items: center; gap: 0.5rem; }
-.toggle-control label { font-size: 0.875rem; color: #475569; cursor: pointer; }
-.toggle-control input { cursor: pointer; }
+.controls-right { display: flex; align-items: center; gap: 1rem; }
 
-
-/* Buttons and Alerts */
+/* --- Buttons and Alerts --- */
 .btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border: 1px solid transparent; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
 .btn-upload { background-color: #f8fafc; border-color: #cbd5e1; }
 .btn-upload:hover { background-color: #f1f5f9; }
 .btn-analyze { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
 .btn-analyze:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(118, 75, 162, 0.3); }
-.btn-save { background-color: #16a34a; color: white; }
+.btn-save { background-color: #16a34a; color: white; font-size: 0.875rem; padding: 0.4rem 0.8rem;}
 .btn-save:hover { background-color: #15803d; }
+.btn-add { background-color: #2563eb; color: white; font-size: 0.875rem; padding: 0.4rem 0.8rem;}
+.btn-add:hover { background-color: #1d4ed8; }
+.btn-cancel { background-color: #f1f5f9; color: #475569; border-color: #e2e8f0;}
+.btn-cancel:hover { background-color: #e2e8f0; }
 .btn.disabled, .btn-save:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
 .error-state { background-color: #fee2e2; color: #b91c1c; }
 .success-state { background-color: #dcfce7; color: #166534; }
 
+/* --- Custom Cells Section --- */
+.custom-cells-section { margin-top: 1.5rem; border-top: 1px solid #e2e8f0; padding-top: 1.5rem; }
+.custom-cells-title { font-size: 1rem; font-weight: 600; color: #475569; margin-bottom: 0.5rem; }
+.custom-table th, .custom-table td { padding: 0.75rem; font-size: 0.875rem; }
+.custom-table th { background-color: #f8fafc; text-align: left; }
+.delete-custom-btn { background: transparent; border: none; color: #ef4444; cursor: pointer; padding: 2px; display: flex; align-items: center; justify-content: center; border-radius: 4px; }
+.delete-custom-btn:hover { background-color: #fee2e2; }
+.datatype-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; background-color: #f1f5f9; color: #475569; font-family: monospace; font-size: 0.8rem; }
+
+/* --- Modal Styles --- */
+.modal-backdrop { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(15, 23, 42, 0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; animation: fadeIn 0.3s ease; }
+.modal-content { background-color: white; border-radius: 12px; padding: 2rem; width: 100%; max-width: 500px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+.modal-content h3 { font-size: 1.25rem; margin-bottom: 1.5rem; color: #1e293b; }
+.form-group { margin-bottom: 1rem; }
+.form-group label { display: block; font-weight: 500; font-size: 0.875rem; color: #475569; margin-bottom: 0.5rem; }
+.form-group input { width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 1rem; }
+.form-group input:focus { outline: none; border-color: #4f46e5; box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2); }
+.form-actions { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 2rem; }
+.radio-group { display: flex; gap: 1.5rem; align-items: center; }
+.radio-group label { display: flex; align-items: center; gap: 0.5rem; font-weight: normal; }
+.radio-group {
+  display: flex;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.radio-group label {
+  flex: 1; /* Make both labels take up equal space */
+  position: relative; /* Needed for positioning the hidden input */
+  text-align: center;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  color: #475569;
+  background-color: #f8fafc;
+  transition: background-color 0.2s ease;
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.radio-group label:not(:last-child) {
+  border-right: 1px solid #cbd5e1;
+}
+
+.radio-group label:hover {
+  background-color: #f1f5f9;
+}
+
+/* Hide the actual radio button */
+.radio-group input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+/* Style the label's text span */
+.radio-label-text {
+  display: block;
+}
+
+/* This is the key: style the span when the hidden radio button is checked */
+.radio-group input[type="radio"]:checked + .radio-label-text {
+  color: white;
+}
+
+/* We also need to change the label's background */
+.radio-group input[type="radio"]:checked {
+  background-color: #4f46e5 !important;
+}
+.radio-group label:has(input:checked) {
+    background-color: #4f46e5;
+    color: white;
+}
 
 /* Empty/Loading States */
 .empty-state, .loading-overlay { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #64748b; position: absolute; width: 100%; top: 0; left: 0; }
 .empty-state-icon { margin-bottom: 1rem; color: #94a3b8; }
 .animate-spin { animation: spin 1s linear infinite; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
