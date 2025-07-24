@@ -367,7 +367,7 @@ function App() {
 
       <header className="App-header">
         <div className="header-main">
-            <h1>Document Intelligence Platform</h1>
+            <h1>OCR Onboarding Platform</h1>
             <div className="controls">
                 <input ref={fileInputRef} type="file" accept="image/*,application/pdf" onChange={onFileChange} style={{ display:'none' }}/>
                 <button className="btn btn-upload" onClick={onUpload}><Upload size={18}/> {imageFile?'Change Document':'Upload Document'}</button>
