@@ -68,6 +68,8 @@ function App() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [customCells, setCustomCells] = useState([]);
   const [isAnnotating, setIsAnnotating] = useState(false);
+  const [headerMap, setHeaderMap] = useState(new Map());
+  const [rawAiResponse, setRawAiResponse] = useState('');
   const [cropPixels, setCropPixels] = useState(null);
   const [croppedImage, setCroppedImage] = useState(null);
   const [isProcessingCrop, setIsProcessingCrop] = useState(false);
@@ -136,9 +138,7 @@ function App() {
     }).filter(Boolean);
   }
 
-  // --- EVENT HANDLERS ---
-  // Find and replace this function in App.js
-
+    // --- EVENT HANDLERS ---
   const handleBlockClick = (blockId) => {
     const docId = blockToDocumentMap.get(blockId);
     if (!docId) return;
@@ -191,87 +191,312 @@ function App() {
     }]);
   };
   
-  const onAnalyze = async () => {
-    if (!imageFile) { setError('Select a document first.'); return; }
-    setLoading(true);
-    setError(''); setSuccess('');
+  // In App.js, add this new function
 
-    try {
-      const fd = new FormData(); fd.append('file', imageFile);
-      const resp = await fetch(API_URL,{method:'POST',body:fd}); // CORRECTED
-      const data = await resp.json(); if (!resp.ok) throw new Error(data.error || 'Analysis failed');
-      
-      const newBlocks = data.Blocks || [];
-      const newBlocksMap = new Map(newBlocks.map(b => [b.Id, b]));
-      setMasterBlocksMap(newBlocksMap);
-      
-      setBlockToDocumentMap(prev => {
-          const newMap = new Map(prev);
-          newBlocks.forEach(b => newMap.set(b.Id, 'main'));
+const performVisionAnalysis = async (imageSource, isAnnotation = false) => {
+  setLoading(true);
+  setError('');
+  
+  const fd = new FormData();
+  fd.append('file', imageSource);
+
+  try {
+    const resp = await fetch('http://127.0.0.1:5001/api/analyze-document-vision', {
+      method: 'POST',
+      body: fd,
+    });
+
+    if (!resp.ok) {
+      const errorData = await resp.json();
+      throw new Error(errorData.error || 'Analysis failed');
+    }
+
+    const data = await resp.json();
+    const textractResponse = data.textractResponse;
+    const aiResponseString = data.aiHeaderAnalysis;
+
+    // --- Process Textract Data ---
+    const newBlocks = textractResponse.Blocks || [];
+    if (newBlocks.length === 0) {
+        throw new Error("Textract did not find any content in the provided area.");
+    }
+    const newBlocksMap = new Map(newBlocks.map(b => [b.Id, b]));
+    
+    // Merge new blocks with master map
+    setMasterBlocksMap(prev => new Map([...prev, ...newBlocksMap]));
+    
+    // Add new tables to the existing list
+    const newTables = parseAndBuildTables(textractResponse, newBlocksMap);
+    setTables(prev => [...prev, ...newTables]);
+
+    // Handle document source for annotations
+    if (isAnnotation) {
+        const docId = `anno-${Date.now()}`;
+        setBlockToDocumentMap(prev => {
+            const newMap = new Map(prev);
+            newBlocks.forEach(b => newMap.set(b.Id, docId));
+            return newMap;
+        });
+        const newDocument = {
+            id: docId,
+            imageUrl: URL.createObjectURL(imageSource), // Create a URL for the preview
+            blocksMap: newBlocksMap,
+            transformRef: createRef()
+        };
+        setDocuments(prev => [...prev, newDocument]);
+    } else { // For initial analysis
+        setBlockToDocumentMap(prev => {
+            const newMap = new Map(prev);
+            newBlocks.forEach(b => newMap.set(b.Id, 'main'));
+            return newMap;
+        });
+        setDocuments(prevDocs => prevDocs.map(doc =>
+            doc.id === 'main' ? { ...doc, blocksMap: newBlocksMap } : doc
+        ));
+    }
+
+    // --- Process Vision AI Data ---
+    if (aiResponseString) {
+      console.log(`--- RAW AI VISION RESPONSE (${isAnnotation ? 'Annotation' : 'Initial'}) ---`);
+      console.log(aiResponseString);
+      setRawAiResponse(prev => prev + '\n' + aiResponseString); // Append new results
+
+      try {
+        const parsedResult = JSON.parse(aiResponseString);
+        setHeaderMap(prevMap => {
+          const newMap = new Map(prevMap);
+          for (const [cellId, headers] of Object.entries(parsedResult)) {
+            if (headers.rowHeader && headers.colHeader) {
+              newMap.set(cellId, headers);
+            }
+          }
           return newMap;
-      });
+        });
+      } catch (e) {
+        console.error("Failed to parse AI Vision response for annotation:", e);
+        // Don't throw an error, just log it. The Textract data is still valuable.
+      }
+    }
+    
+    return true; // Indicate success
 
-      setDocuments(prevDocs => prevDocs.map(doc => 
-          doc.id === 'main' ? { ...doc, blocksMap: newBlocksMap } : doc
-      ));
+  } catch (e) {
+    setError(e.message);
+    return false; // Indicate failure
+  } finally {
+    setLoading(false);
+  }
+};
 
-      const newTables = parseAndBuildTables(data, newBlocksMap);
-      setTables(newTables);
-      setSuccess('Analysis successful');
-    } catch (e) { setError(e.message); } finally { setLoading(false); }
-  };
+  const onAnalyze = async () => {
+  if (!imageFile) {
+    setError('Select a document first.');
+    return;
+  }
+  
+  // Reset everything for the new analysis
+  setLoading(true);
+  setError('');
+  setSuccess('');
+  setRawAiResponse('');
+  setTables([]);
+  setMasterBlocksMap(new Map());
+  setHeaderMap(new Map());
+
+  // --- STEP 1: FAST TEXTRACT ANALYSIS ---
+  const fdTextract = new FormData();
+  fdTextract.append('file', imageFile);
+
+  try {
+    const textractResp = await fetch('http://127.0.0.1:5001/api/analyze', {
+      method: 'POST',
+      body: fdTextract,
+    });
+    if (!textractResp.ok) {
+        const errorData = await textractResp.json();
+        throw new Error(errorData.error || 'Textract analysis failed');
+    }
+    
+    const textractData = await textractResp.json();
+
+    // PROCESS AND DISPLAY TEXTRACT RESULTS IMMEDIATELY
+    const newBlocks = textractData.Blocks || [];
+    const newBlocksMap = new Map(newBlocks.map(b => [b.Id, b]));
+    setMasterBlocksMap(newBlocksMap);
+
+    setBlockToDocumentMap(new Map(newBlocks.map(b => [b.Id, 'main'])));
+    setDocuments(prevDocs => prevDocs.map(doc =>
+      doc.id === 'main' ? { ...doc, blocksMap: newBlocksMap } : doc
+    ));
+
+    const newTables = parseAndBuildTables(textractData, newBlocksMap);
+    setTables(newTables);
+    
+    setLoading(false); // Stop the main loader
+    setSuccess('Document structure extracted. Analyzing context with AI in background...');
+
+    // --- STEP 2: SLOW VISION ANALYSIS (RUNS IN BACKGROUND) ---
+    // Prepare data for the vision API call
+    const allSimplifiedCells = [];
+    newTables.forEach(table => {
+        if (!table || !table.grid) return;
+        table.grid.forEach((row, rowIndex) => {
+            row.forEach((cell, colIndex) => {
+                if (cell && !cell.spanned) {
+                    allSimplifiedCells.push({
+                        cellId: cell.id,
+                        text: cell.text.trim(),
+                    });
+                }
+            });
+        });
+    });
+
+    const fdVision = new FormData();
+    fdVision.append('file', imageFile);
+    fdVision.append('simplified_cells', JSON.stringify(allSimplifiedCells));
+
+    // Make the second API call without blocking the UI
+    fetch('http://127.0.0.1:5001/api/analyze-vision-context', {
+      method: 'POST',
+      body: fdVision,
+    })
+    .then(response => {
+        if (!response.ok) { throw new Error('AI Vision analysis failed.'); }
+        return response.json();
+    })
+    .then(visionData => {
+        const aiResponseString = visionData.aiHeaderAnalysis;
+        console.log("--- RAW AI VISION RESPONSE RECEIVED ---");
+        console.log(aiResponseString);
+        setRawAiResponse(aiResponseString);
+        setSuccess('AI context analysis complete!');
+        // Optionally, parse and set the headerMap here
+    })
+    .catch(err => {
+        console.error("Background AI analysis failed:", err);
+        // Display a non-critical error to the user
+        setError(`Background AI analysis failed: ${err.message}`);
+    });
+
+  } catch (e) {
+    setError(e.message);
+    setLoading(false);
+  }
+};
+
 
   const handleConfirmAndAnalyzeCrop = async () => {
-    if (!croppedImage) return;
-    setIsProcessingCrop(true);
-    setError('');
-    
-    try {
-      const imageBlob = await fetch(croppedImage).then(r => r.blob());
-      const fd = new FormData();
-      fd.append('file', imageBlob, 'cropped-image.jpeg');
-      
-      const resp = await fetch(API_URL,{method:'POST',body:fd}); // CORRECTED
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || 'Analysis failed');
+  if (!croppedImage) return;
+  setIsProcessingCrop(true); // Use the dedicated loader for the modal
 
-      const newBlocks = data.Blocks || [];
-      const newBlocksMap = new Map(newBlocks.map(b => [b.Id, b]));
-      const newMasterMap = new Map([...masterBlocksMap, ...newBlocksMap]);
-      
-      setMasterBlocksMap(newMasterMap);
-      
-      const docId = `anno-${Date.now()}`;
-      setBlockToDocumentMap(prev => {
-          const newMap = new Map(prev);
-          newBlocks.forEach(b => newMap.set(b.Id, docId));
-          return newMap;
-      });
+  try {
+    const imageBlob = await fetch(croppedImage).then(r => r.blob());
+    const imageFileFromBlob = new File([imageBlob], "annotated-crop.jpg", { type: "image/jpeg" });
 
-      const newDocument = {
-          id: docId,
-          imageUrl: croppedImage,
-          blocksMap: newBlocksMap,
-          transformRef: createRef()
-      };
-      setDocuments(prev => [...prev, newDocument]);
+    // --- STEP 1: FAST TEXTRACT ANALYSIS FOR THE CROP ---
+    const fdTextract = new FormData();
+    fdTextract.append('file', imageFileFromBlob);
 
-      const newTables = parseAndBuildTables(data, newMasterMap);
-      setTables(prev => [...prev, ...newTables]);
-      
-      setCroppedImage(null);
-      setIsAnnotating(false);
-      setCropPixels(null);
-      setSuccess('New annotated section added!');
+    const textractResp = await fetch('http://127.0.0.1:5001/api/analyze', {
+      method: 'POST',
+      body: fdTextract,
+    });
 
-    } catch(e) {
-      setError(`Cropped area analysis failed: ${e.message}`);
-      if (croppedImage) URL.revokeObjectURL(croppedImage);
-      setCroppedImage(null);
-    } finally {
-      setIsProcessingCrop(false);
+    if (!textractResp.ok) {
+      const errorData = await textractResp.json();
+      throw new Error(errorData.error || 'Cropped area analysis failed');
     }
-  };
+
+    const textractData = await textractResp.json();
+
+    // PROCESS AND DISPLAY THE NEW ANNOTATED TABLE IMMEDIATELY
+    const newBlocks = textractData.Blocks || [];
+    if (newBlocks.length === 0) {
+        throw new Error("Textract did not find any content in the annotated area.");
+    }
+    const newBlocksMap = new Map(newBlocks.map(b => [b.Id, b]));
+    setMasterBlocksMap(prev => new Map([...prev, ...newBlocksMap]));
+
+    const newTables = parseAndBuildTables(textractData, newBlocksMap);
+    setTables(prev => [...prev, ...newTables]);
+
+    const docId = `anno-${Date.now()}`;
+    setBlockToDocumentMap(prev => {
+        const newMap = new Map(prev);
+        newBlocks.forEach(b => newMap.set(b.Id, docId));
+        return newMap;
+    });
+
+    // We need to create a URL for the preview image.
+    // Since `croppedImage` is a temporary URL, let's pass the blob directly
+    // to avoid revoking it too early.
+    const newDocument = {
+        id: docId,
+        imageUrl: URL.createObjectURL(imageFileFromBlob),
+        blocksMap: newBlocksMap,
+        transformRef: createRef()
+    };
+    setDocuments(prev => [...prev, newDocument]);
+    
+    // UI is now updated, close the modal and show success
+    setCroppedImage(null);
+    setIsAnnotating(false);
+    setCropPixels(null);
+    setSuccess('Annotated section added. Analyzing context with AI in background...');
+
+    // --- STEP 2: SLOW VISION ANALYSIS FOR THE CROP (RUNS IN BACKGROUND) ---
+    const simplifiedCells = [];
+    newTables.forEach(table => {
+        if (!table || !table.grid) return;
+        table.grid.forEach((row) => {
+            row.forEach((cell) => {
+                if (cell && !cell.spanned) {
+                    simplifiedCells.push({
+                        cellId: cell.id,
+                        text: cell.text.trim(),
+                    });
+                }
+            });
+        });
+    });
+
+    const fdVision = new FormData();
+    fdVision.append('file', imageFileFromBlob);
+    fdVision.append('simplified_cells', JSON.stringify(simplifiedCells));
+
+    // Make the second API call without blocking the UI
+    fetch('http://127.0.0.1:5001/api/analyze-vision-context', {
+      method: 'POST',
+      body: fdVision,
+    })
+    .then(response => {
+        if (!response.ok) { throw new Error('AI Vision analysis for annotation failed.'); }
+        return response.json();
+    })
+    .then(visionData => {
+        const aiResponseString = visionData.aiHeaderAnalysis;
+        console.log("--- RAW AI VISION RESPONSE (Annotation) ---");
+        console.log(aiResponseString);
+        setRawAiResponse(prev => prev + '\n' + aiResponseString); // Append results
+        setSuccess('AI context analysis for annotation complete!');
+        // Optionally, parse and merge into the headerMap here
+    })
+    .catch(err => {
+        console.error("Background AI analysis for annotation failed:", err);
+        setError(`Background AI analysis for annotation failed: ${err.message}`);
+    });
+
+  } catch (e) {
+    setError(`Cropped area analysis failed: ${e.message}`);
+    // Ensure modal closes even on failure
+    setCroppedImage(null);
+    setIsAnnotating(false);
+    setCropPixels(null);
+  } finally {
+    setIsProcessingCrop(false);
+  }
+};
 
   const showCroppedImage = useCallback(async () => {
     const mainImageUrl = documents.find(d => d.id === 'main')?.imageUrl;

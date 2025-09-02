@@ -12,6 +12,11 @@ from typing import Dict, Any, Tuple
 import mimetypes
 import json
 import uuid
+from dotenv import load_dotenv
+import openai
+import base64
+from io import BytesIO
+from PIL import Image
 
 import boto3
 from flask import Flask, request, jsonify, Response
@@ -21,6 +26,7 @@ from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.utils import secure_filename
 
 # Configure logging
+load_dotenv()
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -51,6 +57,7 @@ class Config:
     
     # CORS settings
     CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:3000').split(',')
+    OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
 # --- Application Factory ---
 def create_app(config_class=Config) -> Flask:
@@ -74,6 +81,12 @@ def create_app(config_class=Config) -> Flask:
     
     # Register routes
     register_routes(app, config_class)
+
+    if not config_class.OPENAI_API_KEY:
+        logger.warning("OPENAI_API_KEY environment variable not set. Header analysis will fail.")
+    else:
+        openai.api_key = config_class.OPENAI_API_KEY
+        logger.info("OpenAI client initialized successfully.")
     
     logger.info("Application created and configured successfully")
     return app
@@ -181,6 +194,50 @@ def analyze_document_with_textract(image_bytes: bytes, region: str) -> Dict[str,
     
     return response
 
+def get_headers_from_openai_vision(prompt_text: str, image_base64: str) -> str:
+    """
+    Sends a multi-modal prompt (text + image) to the OpenAI Vision API.
+    """
+    try:
+        logger.info(f"Sending multi-modal prompt to OpenAI Vision API. Text length: {len(prompt_text)}")
+        
+        client = openai.OpenAI()
+        
+        completion = client.chat.completions.create(
+            # IMPORTANT: Use a model that supports vision, like gpt-4-vision-preview
+            model="gpt-4.1-mini",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt_text},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{image_base64}"
+                            },
+                        },
+                    ],
+                }
+            ],
+            # max_tokens is important for vision models to ensure a complete response
+            max_tokens=4096 
+        )
+        
+        content = completion.choices[0].message.content
+        logger.info("Successfully received response from OpenAI Vision.")
+        
+        # The response from vision models can sometimes be wrapped in markdown ```json ... ```
+        # This code snippet cleans it up.
+        if "```json" in content:
+            content = content.split("```json")[1].split("```")[0].strip()
+
+        return content
+        
+    except Exception as e:
+        logger.error(f"An unexpected error occurred while calling OpenAI Vision: {e}", exc_info=True)
+        raise
+
 # --- Route Handlers ---
 def register_routes(app: Flask, config: Config):
     """Register application routes."""
@@ -279,6 +336,69 @@ def register_routes(app: Flask, config: Config):
                 "type": "Server Error",
                 "error": "An unexpected error occurred. Please try again."
             }), 500
+        
+    @app.route('/api/analyze-vision-context', methods=['POST'])
+    def analyze_document_vision() -> Response:
+        """
+        Orchestrates a multi-step document analysis:
+        1. Validates file upload.
+        2. Analyzes with AWS Textract.
+        3. Prepares data for Vision AI.
+        4. Analyzes with OpenAI GPT-4 Vision.
+        5. Returns both results.
+        """
+        is_valid, error_message, file = validate_file_upload(request, config)
+        if not is_valid:
+            return jsonify({"error": error_message}), 400
+
+        try:
+            simplified_cells_str = request.form.get('simplified_cells')
+            if not simplified_cells_str:
+                return jsonify({"error": "Missing 'simplified_cells' data in the request."}), 400
+            # --- 1. Read image and prepare for both services ---
+            image_bytes = file.read()
+            if not image_bytes:
+                return jsonify({"error": "Empty file uploaded"}), 400
+
+            # Convert image to Base64 for the AI prompt
+            image = Image.open(BytesIO(image_bytes))
+            # Ensure image is in a web-friendly format and not too large
+            if image.mode == 'PNG':
+                image = image.convert('RGB') # Convert RGBA/P to RGB
+            
+            buffered = BytesIO()
+            image.save(buffered, format="JPEG", quality=85) # Compress slightly
+            image_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+
+            # Create the text part of the multi-modal prompt
+            vision_prompt_text = f"""
+            You are an expert document analyst. I am providing you with an image of a document and a JSON array of cell data that was extracted by an OCR service. The JSON contains the cell's text and a unique 'cellId'.
+
+            Your task is to analyze the IMAGE to determine the correct row and column heading (even subheadings) for each cell listed in the JSON array.
+
+            Your task is to return the **exact same JSON structure**, but with one addition: you must add a new key named `headers`.
+
+            The `headers` object must contain two keys:
+            1.  `row`: A string containing the full, hierarchical row header. Combine parent and child headers with " > ".
+            2.  `col`: A string containing the full, hierarchical column header. Combine parent and child headers in the same way.
+
+            **Do not add, remove, or modify any other keys or values in the original cell objects.** Simply add the `headers` object to each one.
+
+            Here is the JSON input:
+            {simplified_cells_str}
+            """
+
+            # --- 4. Run OpenAI Vision Analysis ---
+            ai_header_analysis = get_headers_from_openai_vision(vision_prompt_text, image_base64)
+
+            # --- 5. Return the combined response ---
+            return jsonify({
+                "aiHeaderAnalysis": ai_header_analysis
+            })
+
+        except Exception as e:
+            logger.error(f"An error occurred during the vision analysis pipeline: {e}", exc_info=True)
+            return jsonify({"error": "An internal server error occurred during analysis."}), 500
 
 # --- Error Handlers ---
 def register_error_handlers(app: Flask):
