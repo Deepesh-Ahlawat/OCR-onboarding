@@ -371,7 +371,37 @@ const performVisionAnalysis = async (imageSource, isAnnotation = false) => {
         console.log(aiResponseString);
         setRawAiResponse(aiResponseString);
         setSuccess('AI context analysis complete!');
-        // Optionally, parse and set the headerMap here
+        try {
+        const parsedResultArray = JSON.parse(aiResponseString);
+
+        // Check if the response is an array before proceeding
+        if (Array.isArray(parsedResultArray)) {
+            setHeaderMap(prevMap => {
+                const newMap = new Map(prevMap);
+                
+                // Iterate over the array of objects
+                parsedResultArray.forEach(item => {
+                    // Make sure the item has the expected structure
+                    if (item.cellId && item.headers && item.headers.row && item.headers.col) {
+                        newMap.set(item.cellId, {
+                            rowHeader: item.headers.row,
+                            colHeader: item.headers.col
+                        });
+                    }
+                });
+                
+                console.log("HeaderMap successfully updated with AI data.");
+                return newMap;
+            });
+        } else {
+            // Log an error if the format is not the expected array
+            console.error("AI response was not in the expected array format:", parsedResultArray);
+            setError("AI analysis returned an unexpected format.");
+        }
+    } catch (e) {
+        console.error("Failed to parse AI Vision response:", e);
+        setError("AI analysis returned an invalid format.");
+    }
     })
     .catch(err => {
         console.error("Background AI analysis failed:", err);
@@ -478,9 +508,39 @@ const performVisionAnalysis = async (imageSource, isAnnotation = false) => {
         const aiResponseString = visionData.aiHeaderAnalysis;
         console.log("--- RAW AI VISION RESPONSE (Annotation) ---");
         console.log(aiResponseString);
-        setRawAiResponse(prev => prev + '\n' + aiResponseString); // Append results
+        setRawAiResponse(prev => prev + '\n' + aiResponseString); //ha Append results
         setSuccess('AI context analysis for annotation complete!');
-        // Optionally, parse and merge into the headerMap here
+        try {
+        const parsedResultArray = JSON.parse(aiResponseString);
+
+        // Check if the response is an array before proceeding
+        if (Array.isArray(parsedResultArray)) {
+            setHeaderMap(prevMap => {
+                const newMap = new Map(prevMap);
+                
+                // Iterate over the array of objects
+                parsedResultArray.forEach(item => {
+                    // Make sure the item has the expected structure
+                    if (item.cellId && item.headers && item.headers.row && item.headers.col) {
+                        newMap.set(item.cellId, {
+                            rowHeader: item.headers.row,
+                            colHeader: item.headers.col
+                        });
+                    }
+                });
+                
+                console.log("HeaderMap successfully updated with AI data.");
+                return newMap;
+            });
+        } else {
+            // Log an error if the format is not the expected array
+            console.error("AI response was not in the expected array format:", parsedResultArray);
+            setError("AI analysis returned an unexpected format.");
+        }
+    } catch (e) {
+        console.error("Failed to parse AI Vision response:", e);
+        setError("AI analysis returned an invalid format.");
+    }
     })
     .catch(err => {
         console.error("Background AI analysis for annotation failed:", err);
@@ -520,15 +580,73 @@ const performVisionAnalysis = async (imageSource, isAnnotation = false) => {
   const handleTagInputKeyDown = (e) => { if (e.key === 'Enter' || e.key === 'Escape') { setActiveTaggingCell(null); } };
   const handleDeleteTag = (cellId) => { const newTags = new Map(sensorTags); newTags.delete(cellId); setSensorTags(newTags); };
   
-  const handleSaveTags = async () => {
-    setIsSaving(true); setSuccess(''); setError('');
-    const taggedPayload = Array.from(sensorTags.entries()).filter(([, tag]) => tag.trim() !== "").map(([blockId, sensorTag]) => { let cellText = ''; const block = masterBlocksMap.get(blockId); if(!block) return null; const foundCellInTables = tables.flatMap(t => t.grid).flat().find(c => c && c.id === blockId); cellText = foundCellInTables ? foundCellInTables.text : ''; return { blockId: blockId, cellText: cellText.trim(), sensorTag: sensorTag, isCustom: false }; }).filter(Boolean);
-    const customPayload = customCells.map(cell => ({ blockId: cell.id, label: cell.label, valueType: cell.valueType, sensorTag: cell.sensorTag, isCustom: true }));
-    const finalPayload = [...taggedPayload, ...customPayload];
-    console.log("--- Sending to Backend ---"); console.log(JSON.stringify(finalPayload, null, 2));
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setIsSaving(false); setSuccess(`${finalPayload.length} total entries saved successfully!`);
-  };
+  // In App.js, replace your existing handleSaveTags function with this one.
+
+const handleSaveTags = async () => {
+  setIsSaving(true);
+  setSuccess('');
+  setError('');
+
+  // Create a master list of all cell IDs that have either a sensor tag or AI headers.
+  const allCellIds = new Set([
+      ...sensorTags.keys(),
+      ...headerMap.keys()
+  ]);
+
+  const finalPayload = [];
+
+  for (const blockId of allCellIds) {
+    // Find the original cell block to get its text
+    const block = masterBlocksMap.get(blockId);
+    if (!block) continue; // Skip if block not found
+    
+    // This is a more robust way to find cell text
+    let cellText = '';
+    const foundCellInTables = tables.flatMap(t => t.grid).flat().find(c => c && c.id === blockId);
+    cellText = foundCellInTables ? foundCellInTables.text.trim() : '';
+
+    // Get data from our state maps
+    const userSensorTag = sensorTags.get(blockId) || null;
+    const aiHeaders = headerMap.get(blockId) || { rowHeader: null, colHeader: null };
+
+    // We only want to save cells that have a user-assigned tag,
+    // as these are the ones the user has explicitly onboarded.
+    // The AI data is used to enrich this user-tagged data.
+    if (userSensorTag && userSensorTag.trim() !== "") {
+        finalPayload.push({
+          blockId: blockId,
+          cellText: cellText,
+          sensorTag: userSensorTag,
+          isCustom: false,
+          aiContext: { // Embed the AI context
+            rowHeader: aiHeaders.rowHeader,
+            colHeader: aiHeaders.colHeader,
+          },
+        });
+    }
+  }
+
+  // Also include the custom cells, which don't have AI context
+  const customPayload = customCells.map(cell => ({
+    blockId: cell.id,
+    cellText: cell.label, // Use label as the "text"
+    sensorTag: cell.sensorTag,
+    isCustom: true,
+    valueType: cell.valueType,
+    aiContext: null,
+  }));
+  
+  const combinedPayload = [...finalPayload, ...customPayload];
+
+  console.log("--- Sending to Backend (Mimicked) ---");
+  console.log(JSON.stringify(combinedPayload, null, 2));
+
+  // Simulate API call
+  await new Promise(resolve => setTimeout(resolve, 1000));
+  
+  setIsSaving(false);
+  setSuccess(`${combinedPayload.length} total entries saved successfully!`);
+};
   
   const handleAddCustomCell = (newCell) => { setCustomCells(prev => [...prev, newCell]); setIsAddModalOpen(false); };
   const handleDeleteCustomCell = (idToDelete) => { setCustomCells(prev => prev.filter(cell => cell.id !== idToDelete)); };

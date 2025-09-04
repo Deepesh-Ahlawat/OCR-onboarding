@@ -376,7 +376,32 @@ def register_routes(app: Flask, config: Config):
 
             Your task is to analyze the IMAGE to determine the correct row and column heading (even subheadings) for each cell listed in the JSON array.
 
-            Your task is to return the **exact same JSON structure**, but with one addition: you must add a new key named `headers`.
+            Return a single JSON ARRAY. Each object in the array should correspond to a cell from the input and MUST have the following structure:
+            {{
+            "cellId": "the-original-cell-id",
+            "text": "the-original-cell-text",
+            "headers": {{
+                "row": "The identified row header text",
+                "col": "The identified column header text"
+            }}
+            }}
+
+            Example Input JSON:
+            [ {{"cellId": "id-123", "text": "7.0"}}, {{"cellId": "id-456", "text": "16%"}} ]
+
+            Example Output JSON based on the image:
+            [
+            {{
+                "cellId": "id-123",
+                "text": "7.0",
+                "headers": {{ "row": "Free Chlorine", "col": "Shift-A" }}
+            }},
+            {{
+                "cellId": "id-456",
+                "text": "16%",
+                "headers": {{ "row": "SVI30", "col": "Shift-B" }}
+            }}
+            ]
 
             The `headers` object must contain two keys:
             1.  `row`: A string containing the full, hierarchical row header. Combine parent and child headers with " > ".
